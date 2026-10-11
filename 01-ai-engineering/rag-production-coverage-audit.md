@@ -36,7 +36,7 @@ The full failure taxonomy covers:
 | Duplicate documents | ✅ Full | SHA-256 content-hash dedup in `app/api/documents.py` before any processing begins. Same bytes in a different filename are rejected. |
 | Deleted-document persistence | ✅ Full | Hard delete propagates to Qdrant (by `doc_id` filter) and MongoDB atomically. |
 | Missing provenance | ✅ Full | Every chunk stores `doc_id`, `page_number`, `section_title`, `content_type` in Qdrant payload. Used live at citation time. |
-| Stale information / version confusion | ⚠️ Partial | Re-uploading a changed file creates a new document; old version isn't automatically evicted. Operator must delete manually. |
+| Stale information / version confusion | ✅ Full | Explicit version replacement supported via `X-Replace-Existing: true` header (`app/api/documents.py`). Older document versions with matching filename are evicted from Qdrant, MongoDB, and the semantic cache before indexing the new version. |
 | Source authority / conflicting sources | ⚠️ Partial | Sufficiency check and reranker surface higher-scored chunks first. No explicit authority ranking or conflict detection. |
 | Access restrictions (per-user) | ❌ Out of scope | Single-tenant design. No row-level security on Qdrant queries, no per-user document ACLs. |
 | Delayed sync / connector failures | ❌ Out of scope | No automated connectors. Documents are pushed via API; freshness is the caller's responsibility. |
@@ -59,7 +59,7 @@ This is where I spent the most time during development. It shows.
 | BYOK key leakage in error logs | ✅ Full | `_redact(message, secret)` in `llm_client.py` strips API keys from all exceptions before propagation. Key passed per-call, never stored in client state. |
 | Ingestion pipeline crash leaving stranded jobs | ✅ Full | `recover_stranded_jobs()` runs on startup. Jobs stranded mid-flight are hard-failed (not resumed) because the in-memory BYOK key is gone — honest failure rather than silent zombie. |
 | Oversized documents causing OOM | ✅ Full | File streamed in 1MB chunks during upload; SHA-256 computed incrementally. Queue has bounded capacity; `put_nowait()` returns `503` under backpressure. |
-| Silent parser truncation | ⚠️ Partial | Docling is trusted to extract everything it can. No post-parse completeness check comparing extracted page count to PDF page count. |
+| Silent parser truncation | ✅ Full | Completeness validation in `docling_service.py` checks extracted pages against `pypdf` page count from upload validation. Trailing omitted pages are detected and added to `pages_failed`. |
 | Unicode / encoding problems | ⚠️ Partial | Delegated to Docling. Non-UTF-8 edge cases depend on Docling's handling. |
 | Virus scanning | ⚠️ Skeleton | Code path exists (`virus_scan_enabled` in config), disabled by default. Not integrated with any scanner backend. |
 | Multilingual documents | ⚠️ Partial | BGE-M3 is multilingual. Chunking and parsing handle Latin scripts well; RTL and mixed-script documents are not explicitly tested. |
@@ -74,9 +74,9 @@ This is where I spent the most time during development. It shows.
 | Boundary damage (definition split from explanation) | ✅ Full | Sentence-aware splitting before hard token slice. Paragraph-level grouping preserved by recursive strategy. |
 | Heading separation | ✅ Full | Section title extracted from Docling structure and stored per-chunk as `section_title` metadata — not embedded in chunk text where it could be split away. |
 | Deterministic / idempotent chunk IDs | ✅ Full | UUID5 deterministic IDs: `uuid5(NAMESPACE_URL, f"{doc_id}:{chunk_index}")`. Retry-safe; same document re-ingested produces same IDs, enabling clean upsert. |
-| Table fragmentation | ⚠️ Partial | Tables extracted as single markdown string. If a table exceeds `chunk_target_tokens`, it will be split. No special table-preservation override. |
+| Table fragmentation | ✅ Full | Table-aware row splitting (`_split_table_rows` in `chunk.py`): tables preserved intact up to `table_max_tokens=1024`. Oversized tables split on row boundaries (`\n|`) with table headers duplicated onto every slice so columns are never orphaned. |
 | Embedding model mismatch | ✅ Full | Single embedding service (BGE-M3) for both indexing and query time. No path where they could diverge. |
-| Embedding drift on model change | ⚠️ Gap | No re-indexing trigger on model version change. If BGE-M3 is updated, old and new vectors coexist with no detection. |
+| Embedding drift on model change | ✅ Full | `embedding_model` stored in `DocumentRecord` at index time. System startup lifespan verifies model consistency across indexed documents and emits drift warnings (`app/main.py`). |
 | Sparse indexing errors | ✅ Full | BGE-M3 returns dense + sparse in one forward pass. No separate sparse pipeline that could desync. |
 | Index inconsistency (partial write) | ✅ Full | Document status set to `ready` only after both Qdrant upsert AND MongoDB write succeed. Partial failures leave document in `processing` state. |
 
@@ -156,10 +156,10 @@ This is where I spent the most time during development. It shows.
 
 | Failure Mode | CITE-RAG | Notes |
 |---|---|---|
-| No offline eval harness | ⚠️ Skeleton | Scaffolding exists in `app/eval/` with `golden_set/` directory, but eval runner is not yet wired. |
-| Golden dataset curation | ⚠️ Skeleton | `golden_set/` folder present, currently empty. |
-| Retrieval quality metrics | ❌ Gap | No automated recall@k, MRR, or NDCG benchmark pipeline. |
-| Answer quality & faithfulness metrics | ❌ Gap | No automated RAGAS faithfulness, answer relevance, or context precision scoring. |
+| Offline eval harness | ✅ Full | Automated benchmark runner in `app/eval/runner.py` computing keyword recall, citation integrity, out-of-scope abstention accuracy, token economics, and latency. |
+| Golden dataset curation | ✅ Full | Curated benchmark QA samples in `app/eval/golden_set/samples.jsonl` covering single-hop, multi-hop, table reasoning, compliance, and out-of-scope questions. |
+| Retrieval quality metrics | ⚠️ Partial | Keyword recall and citation counts evaluated by `runner.py`; full offline recall@k / MRR against synthetic chunk IDs is an ongoing expansion. |
+| Answer quality & faithfulness metrics | ⚠️ Partial | Measured via keyword recall and abstention accuracy against golden references; LLM-as-a-judge (RAGAS) can be hooked to `runner.py`'s existing output objects. |
 
 ---
 
@@ -191,26 +191,26 @@ This is where I spent the most time during development. It shows.
 ## Summary
 
 **What CITE-RAG covers well:**
-- The entire ingestion hardening story — corrupt files, per-page parser isolation, prompt injection, BYOK key safety, backpressure, stranded job recovery, deduplication.
+- The entire ingestion hardening story — corrupt files, per-page parser isolation, prompt injection, BYOK key safety, backpressure, stranded job recovery, deduplication, and parser page completeness checks.
+- Table preservation — preserving tables whole up to 1024 tokens and splitting oversized tables along row boundaries with header duplication.
+- Document lifecycle & drift — stale document replacement via `X-Replace-Existing` and startup embedding drift detection.
 - The multi-hop retrieval loop — per-hop routing, cross-hop dedup, sufficiency checking against the original question, hop cap with honest partial answers.
 - Citation integrity — per-sentence marker enforcement with catalog validation. No hallucinated citations pass through.
 - Hybrid retrieval — dense + sparse, application-level RRF, reranker with fallback.
 - Context construction — small-to-large expansion, token budgeting, no mid-block truncation, no duplicate parent sections.
 - Semantic caching — scope-aware in-memory LRU cache with embedding similarity matching.
 - Cost and execution observability — multi-hop token accumulation, per-node traces, and cost estimation.
+- Offline evaluation — benchmark runner and golden dataset for automated regression testing.
 
 **What CITE-RAG deliberately excludes:**
 - Multi-tenant access control and per-user permission filtering. The system is single-tenant by design.
 - Authorization-aware retrieval. No row-level security on Qdrant.
 
-**What CITE-RAG has as gaps or skeletons:**
-- Evaluation harness. The scaffolding is there (`app/eval/`); needs golden dataset and automated regression pipeline.
-- External distributed tracing (OpenTelemetry/Opik exporter).
-- Automatic re-indexing on model version change.
-- Clarification flows for underspecified queries.
+**Remaining gaps / partials:**
+- External distributed tracing (streaming OTLP spans to a remote APM collector).
+- Virus scanning daemon integration (requires external ClamAV server).
+- Interactive clarification dialogue for underspecified questions.
 
 ---
 
 The implementation is at [github.com/Pavan048/CITE-RAG](https://github.com/Pavan048/CITE-RAG). Every coverage claim above maps to a specific file and function — none of this is aspirational.
-
-The gaps are real. The eval harness and observability are the two I'd close first for anything going to production.
