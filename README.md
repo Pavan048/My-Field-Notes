@@ -48,6 +48,7 @@ My-Field-Notes/
 *Deep dives into production LLM architectures, agentic orchestration, and retrieval.*
 
 - [x] **Agentic RAG vs. Naive RAG**: When single-pass retrieval breaks and why multi-hop loops are necessary.
+- [x] **RAG in Production — Failure Taxonomy Coverage Audit**: Mapping CITE-RAG against 12 categories of RAG failures (ingestion, chunking, retrieval, citation, security, eval) from Anthropic, Microsoft, NVIDIA, and arXiv research. [→ Read](01-ai-engineering/rag-production-coverage-audit.md)
 - [ ] **Hierarchical Context Management**: Small-to-large chunk expansion and context budgeting.
 - [ ] **Two-Tier Cognitive Memory**: Designing session caching (Redis) + episodic recall (Qdrant) for self-improving agents.
 - [ ] **Evaluation Harnesses & Guardrails**: Measuring relevance, accuracy, and hallucination with Opik.
