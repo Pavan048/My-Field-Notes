@@ -102,11 +102,8 @@ This is where I spent the most time during development. It shows.
 |---|---|---|
 | Vector-only retrieval missing exact identifiers | ✅ Full | Hybrid search: BGE-M3 dense + sparse, fused in application code via RRF (`rrf_k=60`). Sparse leg handles exact-match terms, codes, identifiers. |
 | Poor hybrid fusion | ✅ Full | RRF implemented in `route_retrieve_node`. Server-side Qdrant fusion is not used — application-level fusion gives consistent behavior regardless of Qdrant version. |
-| Missing cross-hop deduplication | ✅ Full | `accumulate_node` is the only node allowed to write `evidence_pool`. Deduplication by `chunk_id` across all hops happens there, not in retrieval. |
-| Hop count unbounded | ✅ Full | `hop_cap=4` enforced in `sufficiency_check_node`. Hop 4 sets `partial_answer` flag and exits — no wasted rewrite call on final hop. |
-| Sufficiency check on wrong question | ✅ Full | LLM judges accumulated pool against the **original question**, not the current sub-question. Prevents the system from satisfying a sub-question and declaring victory. |
 | Reranker unavailable | ✅ Full | Falls back to RRF order if cross-encoder is unreachable. Documented in `rerank_node`. |
-| Hop 2+ routing per sub-question | ✅ Full | Each hop re-routes against `current_sub_question`, not the original query. Enables hop 2 to route to a different document than hop 1. |
+| Missing cross-hop deduplication | ✅ Full | `accumulate_node` is the only node allowed to write `evidence_pool`. Deduplication by `chunk_id` across all hops happens there, not in retrieval. |
 
 ---
 
@@ -131,42 +128,63 @@ This is where I spent the most time during development. It shows.
 
 ---
 
-### 8. Security and Adversarial Inputs
+### 8. Multi-Hop and Reasoning Failures
 
 | Failure Mode | CITE-RAG | Notes |
 |---|---|---|
-| Prompt injection via document content | ✅ Full | `sanitize_text()` in `chunk.py` before any LLM call. |
-| API key exposure in logs | ✅ Full | `_redact()` + per-call key passing, never stored in client object. |
-| Malicious file uploads | ✅ Full | Magic byte check, page count validation, bounded upload stream. |
-| Virus scanning | ⚠️ Skeleton | Flag exists, not wired. |
-| Authorization-aware retrieval | ❌ Out of scope | No per-user filter on Qdrant queries. |
-| Cross-tenant leakage | ❌ Out of scope | Single-tenant design. |
-| OWASP LLM Top 10 — full coverage | ⚠️ Partial | Prompt injection addressed. Model denial-of-service partially addressed via queue backpressure. Others (insecure output handling, training data poisoning) not addressed. |
+| Unbounded reasoning loops | ✅ Full | `hop_cap=4` strictly enforced in `sufficiency_check_node`. Reaching cap sets `partial_answer=True` and exits to generation without wasting a rewrite LLM call. |
+| Sufficiency judgment on wrong target | ✅ Full | LLM judges accumulated pool against the **original user question**, never the current sub-question, preventing premature exit. |
+| Sub-question rewrite drift | ✅ Full | Sub-query rewriting prompt takes original question + full sub-question history + missing evidence to stay on track. |
+| Dynamic per-hop document re-routing | ✅ Full | `route_retrieve_node` runs fresh routing against `current_sub_question` on every hop, allowing hop 2 to query a different document than hop 1. |
+| Intermediate evidence pollution | ✅ Full | `accumulate_node` isolates `latest_hop_candidates` and merges into `evidence_pool` with chunk-level deduplication. |
 
 ---
 
-### 9. Evaluation and Testing
+### 9. Security and Adversarial Inputs
 
 | Failure Mode | CITE-RAG | Notes |
 |---|---|---|
-| No eval harness | ⚠️ Skeleton | `app/eval/` exists with `golden_set/` subdirectory. `__init__.py` is empty. No RAGAS, no Opik integration, no automated regression pipeline. |
-| No golden set | ⚠️ Skeleton | `golden_set/` folder present, currently empty. |
-| Retrieval quality measurement | ❌ Gap | No recall@k, MRR, or NDCG measurement implemented. |
-| Answer quality measurement | ❌ Gap | No faithfulness, answer relevance, or context precision scores. |
+| Prompt injection via document content | ✅ Full | `sanitize_text()` in `chunk.py` redacts adversarial instruction patterns before any LLM call. |
+| API key exposure in logs and traces | ✅ Full | `_redact()` + per-call key passing in `llm_client.py`, never stored in client object or database. |
+| Malicious file uploads / parser bombs | ✅ Full | Magic byte check (`%PDF-`), page count gate via fast `pypdf` xref walk, bounded 1MB chunked upload stream. |
+| Virus scanning backend integration | ⚠️ Skeleton | Feature flag `virus_scan_enabled` and service stub exist, but not hooked to a live ClamAV daemon. |
+| OWASP LLM Top 10 — comprehensive coverage | ⚠️ Partial | Mitigates prompt injection, credential exposure, and denial of service (queue backpressure). Insecure output handling and model poisoning remain unaddressed. |
 
 ---
 
-### 10. Production Operations and Observability
+### 10. Evaluation and Testing
 
 | Failure Mode | CITE-RAG | Notes |
 |---|---|---|
-| Startup recovery for crashed jobs | ✅ Full | `recover_stranded_jobs()` on service start. |
-| Queue backpressure / overload handling | ✅ Full | `put_nowait()` → `503` when queue is full. Worker pool is bounded. |
-| Service outage graceful degradation | ✅ Full | Embedding service down → honest error or hop skip. Reranker down → fallback to RRF. |
+| No offline eval harness | ⚠️ Skeleton | Scaffolding exists in `app/eval/` with `golden_set/` directory, but eval runner is not yet wired. |
+| Golden dataset curation | ⚠️ Skeleton | `golden_set/` folder present, currently empty. |
+| Retrieval quality metrics | ❌ Gap | No automated recall@k, MRR, or NDCG benchmark pipeline. |
+| Answer quality & faithfulness metrics | ❌ Gap | No automated RAGAS faithfulness, answer relevance, or context precision scoring. |
+
+---
+
+### 11. Production Operations and Observability
+
+| Failure Mode | CITE-RAG | Notes |
+|---|---|---|
+| Startup recovery for crashed jobs | ✅ Full | `recover_stranded_jobs()` runs on startup; cleanly fails jobs whose in-memory BYOK keys were lost. |
+| Queue backpressure / overload handling | ✅ Full | Bounded queue with `put_nowait()` returning `503` under backpressure; fixed worker pool. |
+| Service outage graceful degradation | ✅ Full | Embedding outage on hop 1 yields `retrieval_unavailable`; later hops degrade gracefully; reranker falls back to RRF order. |
 | Semantic caching | ✅ Full | In-process LRU cache keyed by dense embedding cosine similarity (`>= 0.97`), partitioned by `file_ids` scope, with TTL and automatic invalidation on document deletion (`app/services/semantic_cache.py`). |
 | Cost & token tracking per request | ✅ Full | Token usage (prompt + completion) tracked per LLM call across LangGraph nodes, accumulated across multi-hop iterations with `operator.add` reducers, and exposed with USD cost estimation in `TokenSummary` (`app/retrieval/debug_trace.py`). |
 | Per-hop node & execution tracing | ✅ Full | LangGraph execution stream trace recording exact path, sub-questions, retrieved chunks per hop, and raw prompt/response traces in `DebugInfo`. |
 | Distributed tracing across external services | ⚠️ Partial | Node-level and hop-level tracing captured in `DebugInfo`; external OpenTelemetry/OTLP exporter not wired. |
+
+---
+
+### 12. Multi-Tenant and Access Control
+
+| Failure Mode | CITE-RAG | Notes |
+|---|---|---|
+| Per-user document access control | ❌ Out of scope | Single-tenant architecture. No user identity or per-user document ownership tables. |
+| Authorization-aware retrieval (RLS) | ❌ Out of scope | Vector search queries run against entire collection or caller-pinned `file_ids`, without row-level security filters. |
+| Cross-tenant data leakage | ❌ Out of scope | No tenant partition keys or tenant isolation guards in storage or caching. |
+
 
 ---
 
