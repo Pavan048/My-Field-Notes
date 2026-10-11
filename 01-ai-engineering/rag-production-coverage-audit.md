@@ -163,9 +163,10 @@ This is where I spent the most time during development. It shows.
 | Startup recovery for crashed jobs | ✅ Full | `recover_stranded_jobs()` on service start. |
 | Queue backpressure / overload handling | ✅ Full | `put_nowait()` → `503` when queue is full. Worker pool is bounded. |
 | Service outage graceful degradation | ✅ Full | Embedding service down → honest error or hop skip. Reranker down → fallback to RRF. |
-| Distributed tracing / observability | ❌ Gap | No Opik, no OpenTelemetry, no span tracking per hop or per node. Observability is logging-only. |
-| Semantic caching | ❌ Gap | Not implemented. Every query hits embedding service + Qdrant. |
-| Cost tracking per request | ❌ Gap | Token usage logged per LLM call but not aggregated or budgeted across multi-hop chains. |
+| Semantic caching | ✅ Full | In-process LRU cache keyed by dense embedding cosine similarity (`>= 0.97`), partitioned by `file_ids` scope, with TTL and automatic invalidation on document deletion (`app/services/semantic_cache.py`). |
+| Cost & token tracking per request | ✅ Full | Token usage (prompt + completion) tracked per LLM call across LangGraph nodes, accumulated across multi-hop iterations with `operator.add` reducers, and exposed with USD cost estimation in `TokenSummary` (`app/retrieval/debug_trace.py`). |
+| Per-hop node & execution tracing | ✅ Full | LangGraph execution stream trace recording exact path, sub-questions, retrieved chunks per hop, and raw prompt/response traces in `DebugInfo`. |
+| Distributed tracing across external services | ⚠️ Partial | Node-level and hop-level tracing captured in `DebugInfo`; external OpenTelemetry/OTLP exporter not wired. |
 
 ---
 
@@ -177,15 +178,16 @@ This is where I spent the most time during development. It shows.
 - Citation integrity — per-sentence marker enforcement with catalog validation. No hallucinated citations pass through.
 - Hybrid retrieval — dense + sparse, application-level RRF, reranker with fallback.
 - Context construction — small-to-large expansion, token budgeting, no mid-block truncation, no duplicate parent sections.
+- Semantic caching — scope-aware in-memory LRU cache with embedding similarity matching.
+- Cost and execution observability — multi-hop token accumulation, per-node traces, and cost estimation.
 
 **What CITE-RAG deliberately excludes:**
 - Multi-tenant access control and per-user permission filtering. The system is single-tenant by design.
 - Authorization-aware retrieval. No row-level security on Qdrant.
 
 **What CITE-RAG has as gaps or skeletons:**
-- Evaluation harness. The scaffolding is there; nothing is wired.
-- Production observability. Structured logging only; no tracing, no metrics.
-- Semantic caching.
+- Evaluation harness. The scaffolding is there (`app/eval/`); needs golden dataset and automated regression pipeline.
+- External distributed tracing (OpenTelemetry/Opik exporter).
 - Automatic re-indexing on model version change.
 - Clarification flows for underspecified queries.
 
