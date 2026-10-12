@@ -30,7 +30,7 @@ Instead of treating software engineering as syntax memorization or surface-level
 
 ```text
 My-Field-Notes/
-├── 01-ai-engineering/          # Multi-agent graphs, RAG architectures, memory, evals
+├── 01-ai-engineering/          # RAG, vector databases, memory, evals, model systems
 ├── 02-system-design/
 │   ├── hld/                    # High-Level Design (distributed systems, caching, queues)
 │   └── lld/                    # Low-Level Design (patterns, concurrency, data structures)
@@ -74,7 +74,7 @@ My-Field-Notes/
 
 - [ ] **Open-Source Agent Memory Breakdown**: A structural comparison of Mem0, Letta (MemGPT), and Zep.
 - [ ] **Autonomous Coding Agent Harnesses**: Sandboxing, execution sandpits, and evaluation loops (SWE-bench / e2b).
-- [ ] **Vector Database Internals**: HNSW indexing vs. Inverted File (IVF) graph traversals in Qdrant.
+- [ ] **Vector Database Internals — field-notes series (in progress)**: Embeddings, ANN indexes, quantization, storage, filtered retrieval, system comparisons, evaluation, and production operations. [→ Start at the master index](01-ai-engineering/vector-databases/00-INDEX.md)
 
 #### 💡 5. Today I Learned (TIL)
 *Atomic, single-concept notes and debugging gotchas.*
