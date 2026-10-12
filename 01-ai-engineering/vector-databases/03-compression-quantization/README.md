@@ -1,26 +1,27 @@
-﻿# Compression and Quantization
+# Compression and quantization
 
-> [!TIP] **TL;DR:** Compressed vectors reduce storage and memory traffic while adding approximation error; compare quality at the same total system budget. Planned notes are `todo`.
+> **TL;DR:** Follow the visual map, then open a focused note for the assumptions, measurement, and references.
 
 ```mermaid
 flowchart LR
-  X[Full precision vector] --> SQ[Scalar / binary]
-  X --> PQ[Product quantization]
-  X --> AQ[Anisotropic quantization]
-  X --> MR[Matryoshka truncation]
+ A[Workload] --> B[Concept map]
+ B --> C[Choose candidate]
+ C --> D[Measure quality + cost]
+ D --> E[Operational decision]
 ```
 
-**Figure Q1.** Representation alternatives.  
-**Takeaway:** Compression changes scoring and candidate ordering; evaluate recall and end-to-end cost together.
+**Figure 1: Simplified study path through this section.**
 
-| File | Focus | Status |
-|---|---|---|
-| [Scalar quantization](01-scalar-quantization.md) | Per-scalar low-bit representation | todo |
-| [Product quantization](02-product-quantization.md) | Subspace codebooks and ADC | todo |
-| [Binary and RaBitQ](03-binary-and-rabitq.md) | Binary scoring and RaBitQ | todo |
-| [Anisotropic quantization / ScaNN](04-anisotropic-quantization-scann.md) | MIPS-aware quantization | todo |
-| [Matryoshka embeddings](05-matryoshka-embeddings.md) | Prefix truncation | todo |
+**Takeaway:** Move from the shared foundation to one method at a time, then validate with measurements.
 
-**Start here:** [Product quantization](02-product-quantization.md).
+| Topic | Use |
+|---|---|
+| [Scalar quantization](01-scalar-quantization.md) | Start here for the decision summary and linked deep note. |
+| [PQ](02-product-quantization.md) | Start here for the decision summary and linked deep note. |
+| [Binary and RaBitQ](03-binary-and-rabitq.md) | Start here for the decision summary and linked deep note. |
+| [ScaNN](04-anisotropic-quantization-scann.md) | Start here for the decision summary and linked deep note. |
+| [Matryoshka](05-matryoshka-embeddings.md) | Start here for the decision summary and linked deep note. |
 
+**Start here:** [Scalar quantization](01-scalar-quantization.md).
 
+**Next:** [Vector databases master index](../00-INDEX.md).

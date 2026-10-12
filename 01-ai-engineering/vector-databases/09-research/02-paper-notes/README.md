@@ -1,18 +1,24 @@
-﻿# 02 paper notes
+# Paper notes
 
-> [!TIP] **TL;DR:** This planned module has not been researched or authored yet. See the [master index](../../00-INDEX.md) for status and scope.
+> **TL;DR:** Follow the visual map, then open a focused note for the assumptions, measurement, and references.
 
-## Status
+```mermaid
+flowchart LR
+ A[Workload] --> B[Concept map]
+ B --> C[Choose candidate]
+ C --> D[Measure quality + cost]
+ D --> E[Operational decision]
+```
 
-**Status:** todo — placeholder only. No technical claims are made here.
+**Figure 1: Simplified study path through this section.**
 
-## Planned contents
+**Takeaway:** Move from the shared foundation to one method at a time, then validate with measurements.
 
-See the module scope in the [master index](../../00-INDEX.md).
+| Topic | Use |
+|---|---|
+| [diskann-subramanya](diskann-subramanya.md) | Start here for the decision summary and linked deep note. |
+| [filtered-diskann-gollapudi](filtered-diskann-gollapudi.md) | Start here for the decision summary and linked deep note. |
+| [hnsw-malkov-yashunin](hnsw-malkov-yashunin.md) | Start here for the decision summary and linked deep note. |
+| [product-quantization-jegou](product-quantization-jegou.md) | Start here for the decision summary and linked deep note. |
 
-**Next:** [Master index](../../00-INDEX.md).
-**Related:** [Glossary](../../99-glossary.md).
-
-
-
-
+**Next:** [Vector databases master index](../../00-INDEX.md).

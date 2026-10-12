@@ -1,21 +1,37 @@
-﻿# wal durability replication
+# WAL, durability, and replication
 
-> [!TIP] **TL;DR:** Planned note; content, sources, and measurements are pending research. This placeholder makes the intended navigation visible.
+> **TL;DR:** A WAL records changes before data pages are safely persisted; the acknowledged-write guarantee depends on flush and replication policy.
 
-## Status
+```mermaid
+sequenceDiagram
+ participant C as Client
+ participant L as Leader
+ participant W as WAL
+ participant F as Followers
+ C->>L: write
+ L->>W: append + flush policy
+ L->>F: replicate (policy-dependent)
+ L-->>C: acknowledge at configured boundary
+```
 
-**Status:** todo. No technical claims are made in this placeholder.
+**Figure 1: Simplified conceptual view of this topic.**
 
-## Planned scope
+**Takeaway:** Follow the arrows to see where the method spends work and where the main trade-off enters.
 
-See the [master index](../00-INDEX.md) for the planned scope and reading path. Replace this placeholder with researched content in its assigned module run.
+### How to read this
 
-## TODO-VERIFY
+- Follow arrows in the direction data or decisions move.
+- The labels name the main components; they do not promise a specific implementation.
+- Use the table and field notes below to connect the picture to measurements.
 
-- No factual claims yet; add verified sources when authoring.
+**Visual takeaway:** The diagram shows the main data or decision path; labels are conceptual, not performance guarantees.
 
-**Next:** [Master index](../00-INDEX.md).
-**Related:** [Glossary](../99-glossary.md).
+## Field notes
 
+Document whether acknowledgment means process memory, local durable log, quorum, or remote replicas. Recovery replays durable log records; checkpoints bound replay time. Asynchronous replication can lose recent acknowledged writes during failover depending on the contract. Verify consistency semantics from the selected system/version documentation before relying on them.
 
+## Sources
 
+[PostgreSQL WAL](https://www.postgresql.org/docs/current/wal-intro.html) · [PostgreSQL replication](https://www.postgresql.org/docs/current/warm-standby.html). Product behavior and defaults can vary by release; pin the version used in any benchmark.
+
+**Next:** [Master index](../00-INDEX.md) · [Glossary](../99-glossary.md).

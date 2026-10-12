@@ -1,21 +1,33 @@
-﻿# anisotropic quantization scann
+# Anisotropic quantization and ScaNN
 
-> [!TIP] **TL;DR:** Planned note; content, sources, and measurements are pending research. This placeholder makes the intended navigation visible.
+> **TL;DR:** For maximum-inner-product search, errors parallel to a candidate vector can affect ranking more than perpendicular errors; quantizers can weight these directions differently.
 
-## Status
+```mermaid
+flowchart LR
+ Q[query] --> C[partition / candidate generation]
+ C --> A[anisotropic residual quantization]
+ A --> R[score candidates]
+ R --> E[optional exact rerank]
+```
 
-**Status:** todo. No technical claims are made in this placeholder.
+**Figure 1: Simplified conceptual view of this topic.**
 
-## Planned scope
+**Takeaway:** Follow the arrows to see where the method spends work and where the main trade-off enters.
 
-See the [master index](../00-INDEX.md) for the planned scope and reading path. Replace this placeholder with researched content in its assigned module run.
+### How to read this
 
-## TODO-VERIFY
+- Follow arrows in the direction data or decisions move.
+- The labels name the main components; they do not promise a specific implementation.
+- Use the table and field notes below to connect the picture to measurements.
 
-- No factual claims yet; add verified sources when authoring.
+**Visual takeaway:** The diagram shows the main data or decision path; labels are conceptual, not performance guarantees.
 
-**Next:** [Master index](../00-INDEX.md).
-**Related:** [Glossary](../99-glossary.md).
+## Field notes
 
+ScaNN combines partitioning with quantization and score-aware candidate selection. Its anisotropic objective penalizes residual components according to their effect on inner products rather than treating every squared-error direction equally. This is most relevant for MIPS workloads; cosine and L2 pipelines need metric-consistent transformations and benchmarks.
 
+## Sources
 
+[ScaNN paper](https://arxiv.org/abs/1908.10396) · [ScaNN repository](https://github.com/google-research/google-research/tree/master/scann). Product behavior and defaults can vary by release; pin the version used in any benchmark.
+
+**Next:** [Master index](../00-INDEX.md) · [Glossary](../99-glossary.md).

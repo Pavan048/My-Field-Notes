@@ -1,23 +1,24 @@
-﻿# Research
+# Research notes
 
-> [!TIP] **TL;DR:** Paper notes separate a paper's actual method and reported evaluation from vendor implementation claims and later adoption. Planned research notes are `todo`.
+> **TL;DR:** Follow the visual map, then open a focused note for the assumptions, measurement, and references.
 
 ```mermaid
 flowchart LR
-  P[Primary paper] --> M[Method and assumptions]
-  M --> R[Reported results / limits]
-  R --> S[System docs and adoption evidence]
+ A[Workload] --> B[Concept map]
+ B --> C[Choose candidate]
+ C --> D[Measure quality + cost]
+ D --> E[Operational decision]
 ```
 
-**Figure R1.** Evidence path for a paper note.  
-**Takeaway:** Cite the primary source for a research claim and product documentation for shipped behavior.
+**Figure 1: Simplified study path through this section.**
 
-| File | Focus | Status |
-|---|---|---|
-| [Paper index](01-paper-index.md) | Bibliography and research lineage | todo |
-| [Paper notes](02-paper-notes/) | Notes per selected primary paper | todo |
-| [Open problems and trends](03-open-problems-and-trends.md) | Bounded, cited 2024â€“2026 scan | todo |
+**Takeaway:** Move from the shared foundation to one method at a time, then validate with measurements.
+
+| Topic | Use |
+|---|---|
+| [Paper index](01-paper-index.md) | Start here for the decision summary and linked deep note. |
+| [Open questions](03-open-problems-and-trends.md) | Start here for the decision summary and linked deep note. |
 
 **Start here:** [Paper index](01-paper-index.md).
 
-
+**Next:** [Vector databases master index](../00-INDEX.md).

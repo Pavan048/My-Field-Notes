@@ -1,21 +1,29 @@
-﻿# fundamentals qa
+# Fundamentals Q&A
 
-> [!TIP] **TL;DR:** Planned note; content, sources, and measurements are pending research. This placeholder makes the intended navigation visible.
+> **TL;DR:** Strong answers define the metric, baseline, and workload before naming an index.
 
-## Status
+```mermaid
+flowchart LR
+ Embeddings --> Metric --> Exact
+kNN --> ANN --> Evaluation
+```
 
-**Status:** todo. No technical claims are made in this placeholder.
+**Visual takeaway:** The diagram shows the main data or decision path; labels are conceptual, not performance guarantees.
 
-## Planned scope
+## At a glance
 
-See the [master index](../00-INDEX.md) for the planned scope and reading path. Replace this placeholder with researched content in its assigned module run.
+| Question | Practical answer |
+|---|---|
+| What to measure | Quality against an exact or judged baseline, latency percentiles, resource use |
+| Main trade-off | Search work and representation cost versus recall, freshness, and complexity |
+| First diagnostic | Hold the data, metric, filters, and query set fixed; change one variable |
 
-## TODO-VERIFY
+## Field notes
 
-- No factual claims yet; add verified sources when authoring.
+**Why normalize?** It makes dot product equal cosine similarity for nonzero unit vectors. **What is recall@k?** The fraction of exact top-k IDs recovered by the approximate result. **Why ANN?** It reduces query work at a controllable quality cost. **When use brute force?** Small corpora, GPU-friendly batches, exactness, or as ground truth. **Is a vector DB just an index?** No: production systems also handle metadata, persistence, updates, filtering, and distribution.
 
-**Next:** [Master index](../00-INDEX.md).
-**Related:** [Glossary](../99-glossary.md).
+## Sources
 
+[ANN survey](https://arxiv.org/abs/1806.09823) · [FAISS paper](https://arxiv.org/abs/1702.08734). Product behavior and defaults can vary by release; pin the version used in any benchmark.
 
-
+**Next:** [Master index](../00-INDEX.md) · [Glossary](../99-glossary.md).

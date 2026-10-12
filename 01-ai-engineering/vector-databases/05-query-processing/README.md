@@ -1,25 +1,26 @@
-﻿# Query Processing
+# Query processing
 
-> [!TIP] **TL;DR:** Real retrieval queries combine a vector objective with predicates, ranking signals, and often reranking; candidate-generation quality must be evaluated under the full query. Planned notes are `todo`.
+> **TL;DR:** Follow the visual map, then open a focused note for the assumptions, measurement, and references.
 
 ```mermaid
 flowchart LR
-  Q[Query + predicates] --> C[Candidate generation]
-  C --> F[Filter / fuse signals]
-  F --> R[Rerank]
-  R --> K[Final top-k]
+ A[Workload] --> B[Concept map]
+ B --> C[Choose candidate]
+ C --> D[Measure quality + cost]
+ D --> E[Operational decision]
 ```
 
-**Figure QP1.** Simplified query pipeline.  
-**Takeaway:** The most relevant index benchmark may not predict the full pipeline's quality or latency.
+**Figure 1: Simplified study path through this section.**
 
-| File | Focus | Status |
-|---|---|---|
-| [Filtered and hybrid search](01-filtered-and-hybrid-search.md) | Predicate-aware retrieval | todo |
-| [BM25, dense, sparse](02-hybrid-bm25-dense-sparse.md) | Lexical/vector fusion | todo |
-| [Reranking and multivector](03-reranking-and-multivector.md) | Late interaction and rerankers | todo |
-| [Query planning](04-query-planning-and-cost-model.md) | Selectivity and cost model | todo |
+**Takeaway:** Move from the shared foundation to one method at a time, then validate with measurements.
+
+| Topic | Use |
+|---|---|
+| [Filtered search](01-filtered-and-hybrid-search.md) | Start here for the decision summary and linked deep note. |
+| [Hybrid retrieval](02-hybrid-bm25-dense-sparse.md) | Start here for the decision summary and linked deep note. |
+| [Reranking](03-reranking-and-multivector.md) | Start here for the decision summary and linked deep note. |
+| [Planning](04-query-planning-and-cost-model.md) | Start here for the decision summary and linked deep note. |
 
 **Start here:** [Filtered and hybrid search](01-filtered-and-hybrid-search.md).
 
-
+**Next:** [Vector databases master index](../00-INDEX.md).

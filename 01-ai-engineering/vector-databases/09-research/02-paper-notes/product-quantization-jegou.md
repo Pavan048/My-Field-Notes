@@ -1,21 +1,34 @@
-﻿# product quantization jegou
+# Product quantization paper note
 
-> [!TIP] **TL;DR:** Planned note; content, sources, and measurements are pending research. This placeholder makes the intended navigation visible.
+> **TL;DR:** Product quantization compresses vectors by independently quantizing subvectors, enabling compact codes and efficient approximate distance computation.
 
-## Status
+```mermaid
+flowchart LR
+ X --> Split[subvectors]
+ Split --> C[learn codebooks]
+ C --> E[compact codes]
+ Q --> T[distance lookup tables]
+ E --> T --> D[approximate distances]
+```
 
-**Status:** todo. No technical claims are made in this placeholder.
+**Figure 1: Simplified conceptual view of this topic.**
 
-## Planned scope
+**Takeaway:** Follow the arrows to see where the method spends work and where the main trade-off enters.
 
-See the [master index](../../00-INDEX.md) for the planned scope and reading path. Replace this placeholder with researched content in its assigned module run.
+### How to read this
 
-## TODO-VERIFY
+- Follow arrows in the direction data or decisions move.
+- The labels name the main components; they do not promise a specific implementation.
+- Use the table and field notes below to connect the picture to measurements.
 
-- No factual claims yet; add verified sources when authoring.
+**Visual takeaway:** The diagram shows the main data or decision path; labels are conceptual, not performance guarantees.
 
-**Next:** [Master index](../../00-INDEX.md).
-**Related:** [Glossary](../../99-glossary.md).
+## Field notes
 
+The core insight is decomposing a high-dimensional space into lower-dimensional subspaces whose codebooks can be combined. ADC compares an uncompressed query to encoded database vectors via precomputed tables. Distortion, subspace correlation, training sample representativeness, and reranking policy determine practical quality.
 
+## Sources
 
+[Product quantization paper](https://doi.org/10.1109/TPAMI.2010.57) · [FAISS index guide](https://github.com/facebookresearch/faiss/wiki/Faiss-indexes). Product behavior and defaults can vary by release; pin the version used in any benchmark.
+
+**Next:** [Master index](../../00-INDEX.md) · [Glossary](../../99-glossary.md).

@@ -1,6 +1,6 @@
 ﻿# Foundations
 
-> [!TIP] **TL;DR:** Define the representation and distance semantics, then formalize the nearest-neighbor objective before selecting an index. These notes are planned and remain `todo`.
+> [!TIP] **TL;DR:** Define the representation and distance semantics, then formalize the nearest-neighbor objective before selecting an index. The three foundation notes are now authored with exact-score baselines and source links.
 
 ```mermaid
 flowchart LR
@@ -14,9 +14,9 @@ flowchart LR
 
 | File | Focus | Status |
 |---|---|---|
-| [Embeddings and similarity](01-embeddings-and-similarity.md) | Embeddings, cosine/dot/L2, normalization, geometry | todo |
-| [Nearest-neighbor problem](02-nearest-neighbor-problem.md) | Exact cost, ANN, recall@k | todo |
-| [Vector DB vs traditional DB](03-vector-db-vs-traditional-db.md) | Database, extension, engine, library categories | todo |
+| [Embeddings and similarity](01-embeddings-and-similarity.md) | Embeddings, cosine/dot/L2, normalization, geometry | reviewed |
+| [Nearest-neighbor problem](02-nearest-neighbor-problem.md) | Exact cost, ANN, recall@k | reviewed |
+| [Vector DB vs traditional DB](03-vector-db-vs-traditional-db.md) | Database, extension, engine, library categories | reviewed |
 
 **Start here:** [Embeddings and similarity](01-embeddings-and-similarity.md).
 

@@ -1,21 +1,33 @@
-﻿# qdrant
+# Qdrant
 
-> [!TIP] **TL;DR:** Planned note; content, sources, and measurements are pending research. This placeholder makes the intended navigation visible.
+> **TL;DR:** Qdrant is an open-source vector database with payload filtering and segment-based storage; benchmark its index and filter choices against the workload.
 
-## Status
+```mermaid
+flowchart LR
+ Ingest --> S[segments + payload index]
+ S --> H[HNSW / quantized vectors]
+ Query --> F[payload filter]
+ F --> H --> T[top-k]
+```
 
-**Status:** todo. No technical claims are made in this placeholder.
+**Figure 1: Simplified conceptual view of this topic.**
 
-## Planned scope
+**Takeaway:** Follow the arrows to see where the method spends work and where the main trade-off enters.
 
-See the [master index](../00-INDEX.md) for the planned scope and reading path. Replace this placeholder with researched content in its assigned module run.
+### How to read this
 
-## TODO-VERIFY
+- Follow arrows in the direction data or decisions move.
+- The labels name the main components; they do not promise a specific implementation.
+- Use the table and field notes below to connect the picture to measurements.
 
-- No factual claims yet; add verified sources when authoring.
+**Visual takeaway:** The diagram shows the main data or decision path; labels are conceptual, not performance guarantees.
 
-**Next:** [Master index](../00-INDEX.md).
-**Related:** [Glossary](../99-glossary.md).
+## Field notes
 
+Evaluate payload index coverage, filter selectivity, quantization, replication, and segment lifecycle together. Documentation describes current configuration, but product defaults can evolve: pin the tested server version and record it with benchmark results. Avoid inferring managed-service behavior from an open-source deployment.
 
+## Sources
 
+[Qdrant documentation](https://qdrant.tech/documentation/) · [Qdrant filtering](https://qdrant.tech/articles/vector-search-filtering/). Product behavior and defaults can vary by release; pin the version used in any benchmark.
+
+**Next:** [Master index](../00-INDEX.md) · [Glossary](../99-glossary.md).

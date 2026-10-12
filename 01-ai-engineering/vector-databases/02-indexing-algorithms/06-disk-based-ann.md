@@ -1,21 +1,33 @@
-﻿# disk based ann
+# Disk-based ANN
 
-> [!TIP] **TL;DR:** Planned note; content, sources, and measurements are pending research. This placeholder makes the intended navigation visible.
+> **TL;DR:** SSD-backed graph and partition indexes reduce RAM pressure, but random I/O, caching, and build/update paths become first-class design limits.
 
-## Status
+```mermaid
+flowchart LR
+ Q[query] --> R[RAM entry points/cache]
+ R --> I[SSD reads: adjacency + vectors]
+ I --> T[top-k candidates]
+ T --> X[exact rerank]
+```
 
-**Status:** todo. No technical claims are made in this placeholder.
+**Figure 1: Simplified conceptual view of this topic.**
 
-## Planned scope
+**Takeaway:** Follow the arrows to see where the method spends work and where the main trade-off enters.
 
-See the [master index](../00-INDEX.md) for the planned scope and reading path. Replace this placeholder with researched content in its assigned module run.
+### How to read this
 
-## TODO-VERIFY
+- Follow arrows in the direction data or decisions move.
+- The labels name the main components; they do not promise a specific implementation.
+- Use the table and field notes below to connect the picture to measurements.
 
-- No factual claims yet; add verified sources when authoring.
+**Visual takeaway:** The diagram shows the main data or decision path; labels are conceptual, not performance guarantees.
 
-**Next:** [Master index](../00-INDEX.md).
-**Related:** [Glossary](../99-glossary.md).
+## Field notes
 
+DiskANN uses a navigable graph designed around SSD access; SPANN combines posting lists and an in-memory routing structure; FreshDiskANN and SPFresh address updates with different graph/partition maintenance strategies. Measure I/O per query, cache hit rate, queue depth, and tail latency. Storage locality can matter more than raw distance arithmetic.
 
+## Sources
 
+[DiskANN paper](https://proceedings.neurips.cc/paper/2019/hash/09853c7fb1d3f8ee67a61b6bf4a7f8e6-Abstract.html) · [Filtered-DiskANN](https://doi.org/10.1145/3543507.3583552). Product behavior and defaults can vary by release; pin the version used in any benchmark.
+
+**Next:** [Master index](../00-INDEX.md) · [Glossary](../99-glossary.md).

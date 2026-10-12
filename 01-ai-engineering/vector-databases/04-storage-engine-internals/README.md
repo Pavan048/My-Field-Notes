@@ -1,25 +1,26 @@
-﻿# Storage Engine Internals
+# Storage engine internals
 
-> [!TIP] **TL;DR:** A database index is only one part of the serving engine: mutation logs, segment lifecycle, persistence, and distributed routing determine freshness and recovery. Planned notes are `todo`.
+> **TL;DR:** Follow the visual map, then open a focused note for the assumptions, measurement, and references.
 
 ```mermaid
 flowchart LR
-  W[WAL] --> G[Mutable / growing state]
-  G --> S[Persisted segments]
-  S --> I[Index artifacts]
-  S --> C[Compaction / replacement]
+ A[Workload] --> B[Concept map]
+ B --> C[Choose candidate]
+ C --> D[Measure quality + cost]
+ D --> E[Operational decision]
 ```
 
-**Figure S1.** Conceptual persistence lifecycle; names and guarantees vary by system.  
-**Takeaway:** Track durability, visibility, and index readiness as separate guarantees.
+**Figure 1: Simplified study path through this section.**
 
-| File | Focus | Status |
-|---|---|---|
-| [Segments and LSM](01-segment-architecture-and-lsm.md) | Mutability, compaction, deletes | todo |
-| [Memory vs disk](02-memory-vs-disk-mmap-tiering.md) | mmap, page cache, NUMA, tiers | todo |
-| [WAL and replication](03-wal-durability-replication.md) | Durability and recovery | todo |
-| [Sharding](04-sharding-and-distributed-search.md) | Scatter-gather and global top-k | todo |
+**Takeaway:** Move from the shared foundation to one method at a time, then validate with measurements.
+
+| Topic | Use |
+|---|---|
+| [Segments and LSM](01-segment-architecture-and-lsm.md) | Start here for the decision summary and linked deep note. |
+| [Memory and disk](02-memory-vs-disk-mmap-tiering.md) | Start here for the decision summary and linked deep note. |
+| [WAL and replication](03-wal-durability-replication.md) | Start here for the decision summary and linked deep note. |
+| [Sharding](04-sharding-and-distributed-search.md) | Start here for the decision summary and linked deep note. |
 
 **Start here:** [Segments and LSM](01-segment-architecture-and-lsm.md).
 
-
+**Next:** [Vector databases master index](../00-INDEX.md).

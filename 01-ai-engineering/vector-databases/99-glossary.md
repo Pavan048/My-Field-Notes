@@ -1,4 +1,16 @@
-﻿# Glossary
+# Glossary
+
+```mermaid
+flowchart LR
+ E[Embedding geometry] --> K[Exact kNN]
+ K --> A[ANN index]
+ A --> Q[Query + filters]
+ Q --> M[Metrics + operations]
+```
+
+**Figure 1: Simplified relationship between retrieval terms.**
+
+**Takeaway:** Model geometry and exact retrieval define the terms used to discuss ANN and operations.
 
 Definitions here are deliberately compact. Product-specific meanings must be checked against the cited product version.
 
@@ -12,7 +24,7 @@ Definitions here are deliberately compact. Product-specific meanings must be che
 | Exact kNN | Return the true k nearest records under the chosen metric and eligible-set predicate. A full scan costs Î˜(Nd) arithmetic for N vectors of dimension d. | [FAISS paper](https://arxiv.org/abs/1702.08734) |
 | HNSW | Hierarchical Navigable Small World: multi-layer proximity graph for approximate search. Its observed scaling is workload and implementation dependent, not a general worst-case guarantee. | [Malkov & Yashunin](https://arxiv.org/abs/1603.09320) |
 | IVF | Inverted file: partition vectors into coarse cells and scan selected inverted lists at query time. | [FAISS indexes](https://github.com/facebookresearch/faiss/wiki/Faiss-indexes) |
-| kNN / top-k | k nearest neighbors / the k highest-ranked candidates under a specified score and eligibility rule. | â€” |
+| kNN / top-k | k nearest neighbors / the k highest-ranked candidates under a specified score and eligibility rule. | [FAISS paper](https://arxiv.org/abs/1702.08734) |
 | L2 / Euclidean distance | `||x-y||â‚‚`; smaller is closer. Squared L2 preserves ranking and avoids square roots. | [FAISS metric notes](https://github.com/facebookresearch/faiss/wiki/MetricType-and-distances) |
 | M (HNSW) | Maximum-neighbor parameter used by many HNSW implementations. Layer-0 and upper-layer degree rules vary; don't apply one implementation's memory formula blindly. | [HNSW paper](https://arxiv.org/abs/1603.09320) |
 | MIPS / inner product | Maximum inner-product search ranks by `qÂ·x`; it is not equivalent to cosine unless vector norms are controlled. | [ScaNN paper](https://proceedings.mlr.press/v119/guo20h.html) |
@@ -29,10 +41,9 @@ Definitions here are deliberately compact. Product-specific meanings must be che
 | Tombstone | Marker that hides a deleted record pending physical reclamation/compaction. Whether and how it applies depends on the storage engine. | [Milvus data processing](https://milvus.io/docs/data_processing.md) |
 | WAL | Write-ahead log: record mutations before acknowledging/publishing according to the system's durability contract; exact guarantees vary. | [Milvus architecture](https://milvus.io/docs/architecture_overview.md) |
 
-## TODO-VERIFY
+## Scope note
 
-- Add definitions as researched modules establish terminology and product-specific distinctions.
-- Treat all parameter semantics as implementation/version-specific unless a paper or current official documentation says otherwise.
+Definitions state the general concept. For product-specific parameter semantics, use the versioned official documentation linked by the relevant module.
 
 **Next:** [Master index](00-INDEX.md).  
 **Related:** [Diagram legend](assets/legend.md), [research index](09-research/01-paper-index.md).

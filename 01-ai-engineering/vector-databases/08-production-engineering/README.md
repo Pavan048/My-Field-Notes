@@ -1,28 +1,28 @@
-﻿# Production Engineering
+# Production engineering
 
-> [!TIP] **TL;DR:** Production ownership includes sizing, ingestion/rebuilds, tuning, observability, tenant isolation, and retrieval evaluationâ€”not just index parameters. Planned notes are `todo`.
+> **TL;DR:** Follow the visual map, then open a focused note for the assumptions, measurement, and references.
 
 ```mermaid
 flowchart LR
-  C[Capacity plan] --> I[Ingest and index]
-  I --> T[Tune against eval]
-  T --> O[Observe and recover]
-  O --> M[Multi-tenant controls]
-  M --> R[RAG retrieval quality]
+ A[Workload] --> B[Concept map]
+ B --> C[Choose candidate]
+ C --> D[Measure quality + cost]
+ D --> E[Operational decision]
 ```
 
-**Figure PE1.** Operational lifecycle.  
-**Takeaway:** Changes to the embedding model, filters, or corpus distribution require revalidation.
+**Figure 1: Simplified study path through this section.**
 
-| File | Focus | Status |
-|---|---|---|
-| [Capacity planning](01-capacity-planning-and-cost.md) | Memory / SSD / cost arithmetic | todo |
-| [Ingestion and reindexing](02-ingestion-pipelines-and-reindexing.md) | Freshness and model migration | todo |
-| [Tuning playbook](03-tuning-playbook.md) | Controlled parameter search | todo |
-| [Observability and failure modes](04-observability-and-failure-modes.md) | Signals and response | todo |
-| [Multi-tenancy and security](05-multi-tenancy-security.md) | Isolation and access controls | todo |
-| [RAG retrieval](06-rag-specific-retrieval.md) | Retrieval in generation pipelines | todo |
+**Takeaway:** Move from the shared foundation to one method at a time, then validate with measurements.
+
+| Topic | Use |
+|---|---|
+| [Capacity](01-capacity-planning-and-cost.md) | Start here for the decision summary and linked deep note. |
+| [Ingestion](02-ingestion-pipelines-and-reindexing.md) | Start here for the decision summary and linked deep note. |
+| [Tuning](03-tuning-playbook.md) | Start here for the decision summary and linked deep note. |
+| [Observability](04-observability-and-failure-modes.md) | Start here for the decision summary and linked deep note. |
+| [Tenancy and security](05-multi-tenancy-security.md) | Start here for the decision summary and linked deep note. |
+| [RAG retrieval](06-rag-specific-retrieval.md) | Start here for the decision summary and linked deep note. |
 
 **Start here:** [Capacity planning](01-capacity-planning-and-cost.md).
 
-
+**Next:** [Vector databases master index](../00-INDEX.md).

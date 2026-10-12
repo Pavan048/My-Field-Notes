@@ -1,27 +1,28 @@
-﻿# Interview Bank
+# Interview bank
 
-> [!TIP] **TL;DR:** Answers should start with a crisp, accurate 30-second response and then explain assumptions, math, trade-offs, and operational consequences. Planned Q&A is `todo`.
+> **TL;DR:** Follow the visual map, then open a focused note for the assumptions, measurement, and references.
 
 ```mermaid
 flowchart LR
-  F[Fundamentals] --> A[Algorithms]
-  A --> S[System design]
-  S --> D[Debugging]
-  D --> T[Corner cases]
+ A[Workload] --> B[Concept map]
+ B --> C[Choose candidate]
+ C --> D[Measure quality + cost]
+ D --> E[Operational decision]
 ```
 
-**Figure IB1.** Interview progression.  
-**Takeaway:** Strong answers explain when a claim stops being true.
+**Figure 1: Simplified study path through this section.**
 
-| File | Focus | Status |
-|---|---|---|
-| [Fundamentals Q&A](01-fundamentals-qa.md) | Embeddings and search basics | todo |
-| [Algorithms Q&A](02-algorithms-qa.md) | Index trade-offs | todo |
-| [System design Q&A](03-system-design-qa.md) | Architecture and sizing | todo |
-| [Debugging scenarios](04-debugging-scenarios.md) | Production incidents | todo |
-| [Tricky corner cases](05-tricky-corner-cases.md) | Assumptions and traps | todo |
-| [Rapid-fire 100](06-rapid-fire-100.md) | Short recall practice | todo |
+**Takeaway:** Move from the shared foundation to one method at a time, then validate with measurements.
+
+| Topic | Use |
+|---|---|
+| [01-fundamentals-qa.md](01-fundamentals-qa.md) | Start here for the decision summary and linked deep note. |
+| [02-algorithms-qa.md](02-algorithms-qa.md) | Start here for the decision summary and linked deep note. |
+| [03-system-design-qa.md](03-system-design-qa.md) | Start here for the decision summary and linked deep note. |
+| [04-debugging-scenarios.md](04-debugging-scenarios.md) | Start here for the decision summary and linked deep note. |
+| [05-tricky-corner-cases.md](05-tricky-corner-cases.md) | Start here for the decision summary and linked deep note. |
+| [06-rapid-fire-100.md](06-rapid-fire-100.md) | Start here for the decision summary and linked deep note. |
 
 **Start here:** [Fundamentals Q&A](01-fundamentals-qa.md).
 
-
+**Next:** [Vector databases master index](../00-INDEX.md).

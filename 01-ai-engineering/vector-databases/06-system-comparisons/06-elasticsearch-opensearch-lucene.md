@@ -1,21 +1,35 @@
-﻿# elasticsearch opensearch lucene
+# Elasticsearch, OpenSearch, and Lucene
 
-> [!TIP] **TL;DR:** Planned note; content, sources, and measurements are pending research. This placeholder makes the intended navigation visible.
+> **TL;DR:** Search engines combine inverted lexical indexes with vector retrieval, making hybrid queries and text-centric operations a natural fit.
 
-## Status
+```mermaid
+flowchart LR
+ Docs --> Inv[inverted index / BM25]
+ Docs --> Vec[vector field + ANN]
+ Q[query] --> Lex[lexical candidates]
+ Q --> ANN[vector candidates]
+ Lex --> Fuse[fusion / rerank]
+ ANN --> Fuse
+```
 
-**Status:** todo. No technical claims are made in this placeholder.
+**Figure 1: Simplified conceptual view of this topic.**
 
-## Planned scope
+**Takeaway:** Follow the arrows to see where the method spends work and where the main trade-off enters.
 
-See the [master index](../00-INDEX.md) for the planned scope and reading path. Replace this placeholder with researched content in its assigned module run.
+### How to read this
 
-## TODO-VERIFY
+- Follow arrows in the direction data or decisions move.
+- The labels name the main components; they do not promise a specific implementation.
+- Use the table and field notes below to connect the picture to measurements.
 
-- No factual claims yet; add verified sources when authoring.
+**Visual takeaway:** The diagram shows the main data or decision path; labels are conceptual, not performance guarantees.
 
-**Next:** [Master index](../00-INDEX.md).
-**Related:** [Glossary](../99-glossary.md).
+## Field notes
 
+Lucene underlies core search capabilities, while Elasticsearch and OpenSearch expose product-level APIs and operational models. Index types, quantization, filters, and defaults vary by version. For a fair choice, test hybrid relevance, indexing throughput, shard overhead, and p99 under the same corpus and query distribution.
 
+## Sources
 
+[Elasticsearch vector search](https://www.elastic.co/docs/solutions/search/vector) · [Lucene vector API](https://lucene.apache.org/core/10_3_1/core/org/apache/lucene/util/hnsw/package-summary.html). Product behavior and defaults can vary by release; pin the version used in any benchmark.
+
+**Next:** [Master index](../00-INDEX.md) · [Glossary](../99-glossary.md).

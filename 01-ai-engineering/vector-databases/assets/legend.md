@@ -1,5 +1,17 @@
 ﻿# Diagram legend
 
+```mermaid
+flowchart LR
+ Client[Client / API] --> Planner[Planner / coordinator]
+ Planner --> Index[Index / search]
+ Index --> Segment[Segment / object storage]
+ Planner -. optional / async .-> WAL[WAL / durable log]
+```
+
+**Figure 1: Simplified component and edge labels used throughout the notes.**
+
+**Takeaway:** The label says what a shape represents; line style says whether the path is direct or optional.
+
 Use these conventions across the vector-database notes. Mermaid class colors are optional because GitHub themes differ; labels and line styles carry the meaning.
 
 | Shape / label | Meaning |

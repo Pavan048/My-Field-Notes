@@ -1,25 +1,25 @@
-﻿# Evaluation and Benchmarking
+# Evaluation and benchmarking
 
-> [!TIP] **TL;DR:** Evaluate quality against exact ground truth and report latency distributions, throughput, memory, build/update cost, and workload details together. Planned notes are `todo`.
+> **TL;DR:** Follow the visual map, then open a focused note for the assumptions, measurement, and references.
 
 ```mermaid
 flowchart LR
-  D[Dataset + query workload] --> G[Exact ground truth]
-  D --> A[ANN system sweep]
-  G --> M[Recall / quality]
-  A --> M
-  A --> P[Latency / QPS / memory / build]
+ A[Workload] --> B[Concept map]
+ B --> C[Choose candidate]
+ C --> D[Measure quality + cost]
+ D --> E[Operational decision]
 ```
 
-**Figure E1.** Evaluation flow.  
-**Takeaway:** A recall number without workload, aggregation, and resource measurements is not a useful system comparison.
+**Figure 1: Simplified study path through this section.**
 
-| File | Focus | Status |
-|---|---|---|
-| [Metrics](01-metrics-recall-qps-latency.md) | Recall, QPS, latency percentiles | todo |
-| [ANN benchmarks](02-ann-benchmarks-and-big-ann.md) | Dataset and benchmark methodology | todo |
-| [Build your own eval](03-building-your-own-eval.md) | Reproducible experiment | todo |
+**Takeaway:** Move from the shared foundation to one method at a time, then validate with measurements.
+
+| Topic | Use |
+|---|---|
+| [Metrics](01-metrics-recall-qps-latency.md) | Start here for the decision summary and linked deep note. |
+| [Public benchmarks](02-ann-benchmarks-and-big-ann.md) | Start here for the decision summary and linked deep note. |
+| [Build an evaluation](03-building-your-own-eval.md) | Start here for the decision summary and linked deep note. |
 
 **Start here:** [Metrics](01-metrics-recall-qps-latency.md).
 
-
+**Next:** [Vector databases master index](../00-INDEX.md).
