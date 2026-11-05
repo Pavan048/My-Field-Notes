@@ -1,20 +1,29 @@
 # AI Engineering
 
-This section collects engineering notes on production AI systems, retrieval, model serving, and evaluation.
+This section collects focused field notes on production AI systems. Each subject has its own index and learning path.
 
-## Vector databases
+## Field guides
 
-The vector database field notes cover embeddings, ANN indexes, storage engines, filtered and hybrid retrieval, evaluation, and production operations. Begin at the [master index](vector-databases/00-INDEX.md); its learning paths and question lookup connect concepts to research and implementation.
+| Area | Focus | Status |
+|---|---|---|
+| [Context Manager](context-manager/00-INDEX.md) | Constructing, selecting, ordering, budgeting, compressing and evaluating the active model context | Active |
+| [Agent Memory](agent-memory/00-INDEX.md) | Persisting, updating, retrieving and evaluating information across tasks and sessions | Planned |
+| [Vector databases](vector-databases/00-INDEX.md) | Embeddings, ANN indexes, storage engines, filtered/hybrid retrieval and operations | Existing |
+| [RAG production audit](rag-production-coverage-audit.md) | Production failure modes and coverage checklist for RAG systems | Existing |
+
+## How the field guides relate
 
 ```mermaid
-flowchart LR
-  E[Embeddings and metrics] --> K[Nearest-neighbor search]
-  K --> I[Indexes: IVF, graphs, quantization]
-  I --> S[Storage and distributed execution]
-  S --> Q[Filtered / hybrid query processing]
-  Q --> V[Evaluation and production operations]
+flowchart TD
+  U[Current task / user request] --> C[Context Manager]
+  M[Agent Memory] -->|selected memories / candidates| C
+  R[Retrieval sources] -->|selected evidence| C
+  T[Tools and runtime data] --> C
+  C --> P[Serialized model input]
+  P --> L[LLM invocation]
+  L --> O[Response / tool call]
+  O --> X[Application execution]
+  X -->|optional memory write/update| M
 ```
 
-**Figure 1.** Simplified learning path through the [vector database notes](vector-databases/00-INDEX.md).
-
-**Takeaway:** Understand the representation and objective before choosing an index, then validate the whole query path under the target workload.
+**Boundary:** Context management decides what the model receives for this invocation. Agent memory decides what information persists and may be useful in future invocations. They are related, but they are not the same problem.
