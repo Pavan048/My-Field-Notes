@@ -2,7 +2,7 @@
 
 > **Scope:** How an AI application constructs, budgets, orders, supplies, observes, and manages the *active model context* for each invocation.
 >
-> **Status:** Active learning track · **Current checkpoint:** Foundations, assembly, tokenization and budgeting completed · **Next:** Context ordering and position effects.
+> **Status:** Active learning track · **Current checkpoint:** CM-00 through CM-05 completed · **Next:** Context relevance and selection policies.
 
 ---
 
@@ -80,7 +80,6 @@ The sequence below is dependency-oriented. We will move forward only after under
 | CM-04 | Long-context behavior and utilization | What happens as context grows? How do distraction, interference and position interact? | ✅ Completed |
 | CM-05 | Retrieval as context selection | How should candidates be found, ranked, filtered and fitted into a context? | ✅ Completed |
 | CM-06 | Context relevance and selection policies | How do query processing, evidence coverage, deduplication and diversity shape selection? | ▶ Next |
-| CM-06 | Context relevance and selection policies | How do we decide what to include, exclude, defer or expand? | Planned |
 | CM-07 | Tool context and progressive disclosure | How should tools and schemas be discovered and loaded without overwhelming the context? | Planned |
 | CM-08 | Context compression and compaction | How can context be shortened while retaining task-relevant information? | Planned |
 | CM-09 | Execution context and state handoff | What runtime information must be included for a model to continue a task? | Planned |
@@ -473,4 +472,4 @@ Study:
 
 ---
 
-*Last updated: 2026-11-06*
+*Last updated: 2026-11-07*
