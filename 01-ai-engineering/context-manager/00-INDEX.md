@@ -76,9 +76,10 @@ The sequence below is dependency-oriented. We will move forward only after under
 | CM-00 | Foundations and terminology | What is context? How does it differ from memory, retrieval and runtime state? | ✅ Completed |
 | CM-01 | Context construction and assembly | Which sources contribute to a model invocation, and how are candidates selected? | ✅ Completed |
 | CM-02 | Tokenization, budgets and context windows | What consumes tokens? How do input/output limits and safety margins work? | ✅ Completed |
-| CM-03 | Context ordering and position effects | Does the location of evidence change whether it is used? What does Lost in the Middle show? | ▶ Next |
-| CM-04 | Long-context behavior and utilization | What happens as context grows? How do distraction, interference and position interact? | Planned |
-| CM-05 | Retrieval as context selection | How should candidates be found, ranked, filtered and fitted into a context? | Planned |
+| CM-03 | Context ordering and position effects | Does the location of evidence change whether it is used? What does Lost in the Middle show? | ✅ Completed |
+| CM-04 | Long-context behavior and utilization | What happens as context grows? How do distraction, interference and position interact? | ✅ Completed |
+| CM-05 | Retrieval as context selection | How should candidates be found, ranked, filtered and fitted into a context? | ✅ Completed |
+| CM-06 | Context relevance and selection policies | How do query processing, evidence coverage, deduplication and diversity shape selection? | ▶ Next |
 | CM-06 | Context relevance and selection policies | How do we decide what to include, exclude, defer or expand? | Planned |
 | CM-07 | Tool context and progressive disclosure | How should tools and schemas be discovered and loaded without overwhelming the context? | Planned |
 | CM-08 | Context compression and compaction | How can context be shortened while retaining task-relevant information? | Planned |
@@ -299,10 +300,81 @@ Key distinction:
 - [LongBench repository](https://github.com/THUDM/LongBench)
 - [RULER repository](https://github.com/NVIDIA/RULER)
 
+### CM-05 — Retrieval as context selection
+
+**Question:** Given a large corpus or data source, how does an application find candidate information and decide what actually enters the model's active context?
+
+Core pipeline:
+
+`User query → Query processing → Candidate retrieval → Ranking / reranking → Context selection → Context packing → Serialization → Model invocation`
+
+**Critical distinction**
+- **Retrieval** finds candidate records that may be useful.
+- **Context selection** decides which candidates should enter this invocation.
+- **Context packing** arranges the selected material into a usable representation within the token budget.
+- A high-quality retriever does not guarantee a high-quality final context. Selection can still include duplicates, omit complementary evidence, exceed budget or mix incompatible sources.
+
+**Retrieval approaches**
+1. **BM25 / lexical retrieval:** ranks documents using term frequency, inverse document frequency and document-length normalization. It is often strong for exact identifiers, error codes, class names, API routes, field names and product IDs. Its weakness is vocabulary mismatch: a query and a relevant document can use different wording.
+2. **Dense retrieval:** embeds queries and documents into vectors and retrieves nearby vectors. It can match semantic paraphrases, but vector similarity is not proof that a document contains the needed evidence.
+3. **Hybrid retrieval:** combines lexical and dense candidate sets to capture complementary signals. Reciprocal Rank Fusion (RRF) can combine rankings without assuming that BM25 and vector scores share a comparable scale:
+   `RRF(d) = Σᵣ 1 / (k + rankᵣ(d))`.
+4. **Reranking:** a bi-encoder independently represents query and document; a cross-encoder jointly processes query-document pairs and can make a more informed relevance judgment, usually at greater per-candidate compute cost. A common architecture retrieves a broad candidate set, then reranks a smaller set.
+
+**Selection is a separate optimization problem**
+A naive top-K policy can fill the context with near-duplicate chunks from one source while missing evidence needed to answer another part of the question. A selector may need to consider:
+- query relevance;
+- evidence coverage and complementary facts;
+- redundancy / overlap;
+- source quality and trust;
+- document boundaries and relationships;
+- token cost;
+- whether the candidate answers the question or merely discusses the same topic.
+
+A useful simplified formulation is:
+
+`Choose S to maximize Utility(S, query), subject to Σ tokens(d) ≤ context_budget.`
+
+This is a conceptual objective, not a single universally accepted scoring function. Utility must be defined for the task.
+
+**Retrieval evaluation**
+- **Precision@K:** relevant results among the top K, divided by K.
+- **Recall@K:** relevant results among the top K, divided by all relevant items.
+- **MRR:** mean reciprocal rank of the first relevant result.
+- **nDCG:** rank-sensitive metric that can account for graded relevance.
+- These metrics evaluate retrieval behavior, not whether the final model answer is correct. End-to-end evaluation should additionally inspect evidence coverage, answer correctness, citation correctness, abstention, context tokens, latency and cost.
+
+**Conceptual implementation boundary**
+```python
+def build_context(query, budget):
+    processed = query_processor.process(query)
+    candidates = retriever.retrieve(processed)
+    ranked = ranker.rerank(query=processed, candidates=candidates)
+    selected = context_selector.select(
+        query=processed,
+        candidates=ranked,
+        token_budget=budget,
+    )
+    packed = context_packer.pack(selected)
+    return context_serializer.serialize(packed)
+```
+
+This is an architectural sketch; it does not prescribe a particular framework or ranking algorithm.
+
+**Research selected for later close reading**
+- [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401) — foundational retrieve-then-generate formulation.
+- [HyDE](https://arxiv.org/abs/2212.10496) — query-side hypothetical-document representation for retrieval.
+- [Self-RAG](https://arxiv.org/abs/2310.11511) — retrieval decisions and reflection during generation.
+These remain reading candidates until their methods, evaluations and limitations are studied directly.
+
+**Implementation exercise:** Build a small corpus containing exact identifiers and paraphrased descriptions. Compare BM25, dense and hybrid retrieval; inspect candidate overlap; then apply a token-budgeted selector. Record retrieval metrics separately from final answer quality. Include a case where several duplicate chunks crowd out a second piece of necessary evidence.
+
+**Key lesson:** Retrieval produces candidates. Context management must still decide what is worth spending scarce model-input tokens on.
+
 ### Current checkpoint
 
-- Completed: CM-00, CM-01, CM-02.
-- Next lesson: CM-03 — Context ordering and position effects.
+- Completed: CM-00 through CM-05.
+- Next lesson: CM-06 — Context relevance and selection policies.
 - No deep dive into agent-memory architectures has been counted as completed in this track.
 
 ---
@@ -385,20 +457,19 @@ At the end of each major module, update this index:
 
 ## 12. Next lesson
 
-### CM-03 — Context ordering and position effects
+### CM-06 — Context relevance and selection policies
 
-We will investigate one controlled question:
+We will investigate one practical question:
 
-> If the same relevant evidence is provided with the same task and the same distractors, does moving that evidence to a different position in the context change the model's ability to use it?
+> Given 100 candidate chunks and a limited token budget, how should a context manager select a small, complementary, trustworthy set that covers the user's actual information need?
 
 Study:
-1. Positional information and attention at a conceptual level.
-2. The *Lost in the Middle* paper's task setup and findings.
-3. What the paper does and does not establish.
-4. Practical context-ordering strategies and their limits.
-5. A controlled position-sensitivity experiment.
-
-Primary reading: [Lost in the Middle (Liu et al.)](https://arxiv.org/abs/2307.03172).
+1. Query rewriting, decomposition and multi-query retrieval.
+2. Metadata filters and hard constraints versus soft relevance.
+3. Evidence coverage, diversity, deduplication and redundancy control.
+4. Selecting complementary chunks under a token budget.
+5. Failure analysis: relevant-looking context that does not actually support the answer.
+6. A reproducible selection-policy comparison using a fixed candidate pool.
 
 ---
 
