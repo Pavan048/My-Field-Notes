@@ -237,6 +237,68 @@ Overflow strategies introduced:
 
 Prototype implemented conceptually in the lesson: a Python `ContextBudgetManager` using `tiktoken` to count section tokens, compute a simple budget and report fit. It is a teaching prototype, not production-ready.
 
+### CM-03 — Context ordering and position effects
+
+**Question:** If the same relevant evidence appears at different positions in an otherwise equivalent context, does the model use it equally well?
+
+Learned:
+- Context presence does not guarantee context utilization.
+- Self-attention lets token representations incorporate information from other positions, but attention is not equivalent to successful retrieval, comprehension or reasoning.
+- Transformers incorporate positional information through architecture-dependent mechanisms such as positional embeddings or rotary positional embeddings (RoPE).
+- Positional encoding and position-dependent task performance are different concepts.
+- The *Lost in the Middle* study evaluated multi-document question answering and key-value retrieval while varying the location of relevant information.
+- In many evaluated settings, performance followed a U-shaped pattern: stronger near the beginning and end, weaker in the middle.
+- This is a reported pattern, not a universal ordering rule for every model, task or context length.
+
+Practical implications introduced:
+- Use clear document boundaries and source identifiers.
+- Group related evidence and avoid unnecessary duplication.
+- Treat context ordering as a design variable to evaluate, not a fixed recipe.
+- Keep instructions and task requirements explicit.
+- Preserve evidence provenance for inspection and citations.
+
+**Primary paper:** [Lost in the Middle: How Language Models Use Long Contexts](https://arxiv.org/abs/2307.03172).
+
+**Experiment designed:** EXP-03 — Position sensitivity benchmark. Keep the model, question, evidence, distractors, prompt construction and token length controlled; move the same evidence through beginning, quarter, middle, three-quarter and end positions. Measure answer accuracy, evidence identification, citation correctness, abstention, token count and latency. Use multiple questions and repeated trials.
+
+**Limitations:** The paper does not establish that the end is always optimal, that every model has the same position curve, or that moving evidence fixes retrieval and reasoning failures.
+
+### CM-04 — Long-context behavior and utilization
+
+**Question:** Does a larger context window guarantee that a model can effectively use all the information supplied?
+
+Learned:
+- Context capacity, context utilization and task performance are different properties.
+- Effective context length is task- and metric-dependent; it is not necessarily one universal number for a model.
+- Long inputs can introduce distractor interference, information dilution and multi-hop reasoning challenges.
+- Finding one fact is different from combining multiple facts across documents.
+- A single benchmark score, especially from simple needle retrieval, can hide weaknesses on other long-context tasks.
+
+Research studied:
+
+**[LongBench — A Bilingual, Multitask Benchmark for Long Context Understanding](https://aclanthology.org/2024.acl-long.172/)**
+- Broad evaluation across long-context tasks, including single-document QA, multi-document QA, summarization, few-shot learning, synthetic tasks and code completion.
+- The lesson was to evaluate diverse task types rather than treat one retrieval task as a complete measure of long-context understanding.
+
+**[RULER — What's the Real Context Size of Your Long-Context Language Models?](https://arxiv.org/abs/2404.06654)**
+- Tests capabilities beyond a basic Needle-in-a-Haystack (NIAH) task.
+- Introduces more demanding controlled tasks, including multi-needle retrieval, tracing and aggregation.
+- Passing a simple needle retrieval test does not establish strong performance on complex long-context tasks.
+
+Key distinction:
+- **NIAH:** locate a planted fact among distractors.
+- **Multi-hop:** connect evidence across multiple context locations.
+- **Aggregation:** combine or compute over multiple pieces of evidence.
+- **Long-document summarization:** retain and express important content across a longer source.
+
+**Benchmark caveats:** LongBench offers broad dataset/task coverage; RULER offers controlled capability tests. Neither benchmark alone represents every production workload. Synthetic task success does not prove real-world agent competence.
+
+**Experiment plan:** Evaluate single-fact retrieval, multi-fact retrieval, multi-document QA, multi-hop tracing, aggregation, summarization and codebase understanding over context lengths supported by the selected model. Record accuracy, evidence recall, citation correctness, abstention, input/output tokens, latency, cost and repeatability. Use controlled datasets and repeated trials; do not compare incomparable model/API configurations.
+
+**Systems to inspect later:**
+- [LongBench repository](https://github.com/THUDM/LongBench)
+- [RULER repository](https://github.com/NVIDIA/RULER)
+
 ### Current checkpoint
 
 - Completed: CM-00, CM-01, CM-02.
