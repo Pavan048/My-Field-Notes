@@ -2,7 +2,7 @@
 
 > **Scope:** How an AI application constructs, budgets, orders, supplies, observes, and manages the *active model context* for each invocation.
 >
-> **Status:** Active learning track · **Current checkpoint:** CM-00 through CM-05 completed · **Next:** Context relevance and selection policies.
+> **Status:** Active learning track · **Current checkpoint:** CM-00 through CM-06 completed · **Next:** Tool context and progressive disclosure.
 
 ---
 
@@ -79,8 +79,8 @@ The sequence below is dependency-oriented. We will move forward only after under
 | CM-03 | Context ordering and position effects | Does the location of evidence change whether it is used? What does Lost in the Middle show? | ✅ Completed |
 | CM-04 | Long-context behavior and utilization | What happens as context grows? How do distraction, interference and position interact? | ✅ Completed |
 | CM-05 | Retrieval as context selection | How should candidates be found, ranked, filtered and fitted into a context? | ✅ Completed |
-| CM-06 | Context relevance and selection policies | How do query processing, evidence coverage, deduplication and diversity shape selection? | ▶ Next |
-| CM-07 | Tool context and progressive disclosure | How should tools and schemas be discovered and loaded without overwhelming the context? | Planned |
+| CM-06 | Context relevance and selection policies | How do query processing, evidence coverage, deduplication and diversity shape selection? | ✅ Completed |
+
 | CM-08 | Context compression and compaction | How can context be shortened while retaining task-relevant information? | Planned |
 | CM-09 | Execution context and state handoff | What runtime information must be included for a model to continue a task? | Planned |
 | CM-10 | Multi-agent context transfer | What should cross agent boundaries, and how should handoffs be represented? | Planned |
@@ -299,81 +299,70 @@ Key distinction:
 - [LongBench repository](https://github.com/THUDM/LongBench)
 - [RULER repository](https://github.com/NVIDIA/RULER)
 
-### CM-05 — Retrieval as context selection
+### CM-06 — Context relevance and selection policies
 
-**Question:** Given a large corpus or data source, how does an application find candidate information and decide what actually enters the model's active context?
+**Question:** Given a fixed candidate pool and a limited context budget, how should an application choose a useful, complementary and trustworthy set of evidence?
 
-Core pipeline:
+**Query understanding**
+- Query rewriting makes conversational requests more retrieval-friendly.
+- Query expansion adds alternative terminology when corpus wording differs from the user's wording.
+- Multi-query retrieval searches several formulations and merges their candidate sets.
+- Query decomposition splits a complex request into evidence requirements or sub-questions.
+- More queries may improve coverage, but also increase retrieval cost, candidate duplication and latency.
 
-`User query → Query processing → Candidate retrieval → Ranking / reranking → Context selection → Context packing → Serialization → Model invocation`
+**Hard constraints versus soft ranking**
+- Hard filters determine eligibility: tenant isolation, authorization, customer scope, deletion state, date constraints and access permissions.
+- Soft signals influence ranking: semantic similarity, keyword match, freshness and source authority.
+- Authorization must never be treated as a weighted preference or overridden by a high relevance score.
+- Freshness is task-dependent; newer information is not automatically more useful for historical questions.
 
-**Critical distinction**
-- **Retrieval** finds candidate records that may be useful.
-- **Context selection** decides which candidates should enter this invocation.
-- **Context packing** arranges the selected material into a usable representation within the token budget.
-- A high-quality retriever does not guarantee a high-quality final context. Selection can still include duplicates, omit complementary evidence, exceed budget or mix incompatible sources.
+**Set-level utility and evidence coverage**
+- Individual relevance does not imply that a collection of chunks is collectively useful.
+- Top-K ranking can over-select near-duplicates and miss complementary evidence.
+- Define task evidence requirements, then assess whether the selected set covers them.
+- Complementary chunks provide different facts needed together; redundancy contributes little new information.
+- A simplified coverage measure is the fraction of required evidence categories supported by the selected set. Real tasks may need weighted requirements and multiple supporting sources.
 
-**Retrieval approaches**
-1. **BM25 / lexical retrieval:** ranks documents using term frequency, inverse document frequency and document-length normalization. It is often strong for exact identifiers, error codes, class names, API routes, field names and product IDs. Its weakness is vocabulary mismatch: a query and a relevant document can use different wording.
-2. **Dense retrieval:** embeds queries and documents into vectors and retrieves nearby vectors. It can match semantic paraphrases, but vector similarity is not proof that a document contains the needed evidence.
-3. **Hybrid retrieval:** combines lexical and dense candidate sets to capture complementary signals. Reciprocal Rank Fusion (RRF) can combine rankings without assuming that BM25 and vector scores share a comparable scale:
-   `RRF(d) = Σᵣ 1 / (k + rankᵣ(d))`.
-4. **Reranking:** a bi-encoder independently represents query and document; a cross-encoder jointly processes query-document pairs and can make a more informed relevance judgment, usually at greater per-candidate compute cost. A common architecture retrieves a broad candidate set, then reranks a smaller set.
+**Redundancy and diversity**
+- Distinguish exact duplicates, near duplicates, overlapping chunks, semantic duplicates and genuinely complementary evidence.
+- Maximum Marginal Relevance (MMR) balances query relevance against similarity to already-selected items:
+  `MMR(d) = λ Sim(d,q) − (1−λ) maxₛ∈S Sim(d,s)`.
+- MMR is commonly used as a greedy selection heuristic; it does not guarantee a globally optimal set.
+- Diversity is not the same as coverage: a varied set can still fail to include the evidence required by the task.
 
-**Selection is a separate optimization problem**
-A naive top-K policy can fill the context with near-duplicate chunks from one source while missing evidence needed to answer another part of the question. A selector may need to consider:
-- query relevance;
-- evidence coverage and complementary facts;
-- redundancy / overlap;
-- source quality and trust;
-- document boundaries and relationships;
-- token cost;
-- whether the candidate answers the question or merely discusses the same topic.
+**Budget-aware selection**
+- Selection is a constrained set-utility problem: maximize task utility subject to the sum of selected token costs staying within budget.
+- Compare top-K, token-aware greedy selection and coverage-aware selection.
+- A useful practical policy can combine relevance, evidence coverage gain, diversity, trust, redundancy penalties and token cost.
+- Greedy policies may make locally attractive choices that prevent a better overall combination; evaluate this limitation.
 
-A useful simplified formulation is:
+**Metadata and document structure**
+- Metadata supports eligibility and ranking decisions: tenant, customer, source, timestamps, version, deletion state and access level.
+- Conflicting document versions need provenance, effective dates and deprecation information.
+- Chunk retrieval can lose parent headings, table headers or relationships between sections.
+- Parent-child retrieval, neighbor expansion and conditional document expansion can restore missing structure, but consume additional tokens.
 
-`Choose S to maximize Utility(S, query), subject to Σ tokens(d) ≤ context_budget.`
+**Adaptive context construction**
+- An initial context may expose an evidence gap.
+- A system can perform targeted retrieval for the missing fact, reselect and repack the context, then answer or abstain.
+- Iteration can improve evidence completeness but adds latency, cost and complexity.
 
-This is a conceptual objective, not a single universally accepted scoring function. Utility must be defined for the task.
+**Evaluation**
+Evaluate retrieval, selection, generation and end-to-end behavior separately:
+- Retrieval: Precision@K, Recall@K, MRR and nDCG.
+- Selection: evidence coverage, redundancy, source validity and token use.
+- Generation: answer correctness, citation correctness and abstention quality.
+- System: latency, cost and repeatability.
+High retrieval recall does not prove that the right evidence entered context or was used correctly.
 
-**Retrieval evaluation**
-- **Precision@K:** relevant results among the top K, divided by K.
-- **Recall@K:** relevant results among the top K, divided by all relevant items.
-- **MRR:** mean reciprocal rank of the first relevant result.
-- **nDCG:** rank-sensitive metric that can account for graded relevance.
-- These metrics evaluate retrieval behavior, not whether the final model answer is correct. End-to-end evaluation should additionally inspect evidence coverage, answer correctness, citation correctness, abstention, context tokens, latency and cost.
+**Experiment designed:** Compare four policies on the same fixed candidate pool and token budget: (P1) top-K relevance, (P2) token-aware relevance, (P3) MMR relevance/diversity and (P4) coverage-aware, token-budgeted selection with redundancy control. Deliberately test duplicate-heavy candidates, a necessary low-ranked fact, complementary chunks, cross-tenant candidates, conflicting versions and chunks dependent on parent context. Record selected IDs, reasons, token count, coverage, redundancy, answer accuracy, citation correctness, latency and cost.
 
-**Conceptual implementation boundary**
-```python
-def build_context(query, budget):
-    processed = query_processor.process(query)
-    candidates = retriever.retrieve(processed)
-    ranked = ranker.rerank(query=processed, candidates=candidates)
-    selected = context_selector.select(
-        query=processed,
-        candidates=ranked,
-        token_budget=budget,
-    )
-    packed = context_packer.pack(selected)
-    return context_serializer.serialize(packed)
-```
-
-This is an architectural sketch; it does not prescribe a particular framework or ranking algorithm.
-
-**Research selected for later close reading**
-- [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401) — foundational retrieve-then-generate formulation.
-- [HyDE](https://arxiv.org/abs/2212.10496) — query-side hypothetical-document representation for retrieval.
-- [Self-RAG](https://arxiv.org/abs/2310.11511) — retrieval decisions and reflection during generation.
-These remain reading candidates until their methods, evaluations and limitations are studied directly.
-
-**Implementation exercise:** Build a small corpus containing exact identifiers and paraphrased descriptions. Compare BM25, dense and hybrid retrieval; inspect candidate overlap; then apply a token-budgeted selector. Record retrieval metrics separately from final answer quality. Include a case where several duplicate chunks crowd out a second piece of necessary evidence.
-
-**Key lesson:** Retrieval produces candidates. Context management must still decide what is worth spending scarce model-input tokens on.
+**Key lesson:** Context selection is not merely ranking documents. It is choosing a set of information that collectively supports the task under security and token constraints.
 
 ### Current checkpoint
 
-- Completed: CM-00 through CM-05.
-- Next lesson: CM-06 — Context relevance and selection policies.
+- Completed: CM-00 through CM-06.
+- Next lesson: CM-07 — Tool context and progressive disclosure.
 - No deep dive into agent-memory architectures has been counted as completed in this track.
 
 ---
@@ -456,11 +445,11 @@ At the end of each major module, update this index:
 
 ## 12. Next lesson
 
-### CM-06 — Context relevance and selection policies
+### CM-07 — Tool context and progressive disclosure
 
 We will investigate one practical question:
 
-> Given 100 candidate chunks and a limited token budget, how should a context manager select a small, complementary, trustworthy set that covers the user's actual information need?
+> How should an agent discover and load only the tool descriptions it needs, without flooding its context with every available schema?
 
 Study:
 1. Query rewriting, decomposition and multi-query retrieval.
@@ -472,4 +461,4 @@ Study:
 
 ---
 
-*Last updated: 2026-11-07*
+*Last updated: 2026-11-10*
