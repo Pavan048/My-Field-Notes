@@ -1,29 +1,41 @@
 # AI Engineering
 
-This section collects focused field notes on production AI systems. Each subject has its own index and learning path.
+> Personal field notes on production AI systems. Each topic has a focused index and a single deep-dive blog. Depth over breadth — internals, algorithms, trade-offs, production reality.
 
-## Field guides
+---
 
-| Area | Focus | Status |
-|---|---|---|
-| [Context Manager](context-manager/00-INDEX.md) | Constructing, selecting, ordering, budgeting, compressing and evaluating the active model context | Active |
-| [Agent Memory](agent-memory/00-INDEX.md) | Persisting, updating, retrieving and evaluating information across tasks and sessions | Planned |
-| [Vector databases](vector-databases/00-INDEX.md) | Embeddings, ANN indexes, storage engines, filtered/hybrid retrieval and operations | Existing |
-| [RAG production audit](rag-production-coverage-audit.md) | Production failure modes and coverage checklist for RAG systems | Existing |
+## Topics
 
-## How the field guides relate
+| Topic | What it studies | Status |
+|-------|----------------|--------|
+| [Vector Databases](vector-databases/00-INDEX.md) | Embedding geometry · ANN indexes (HNSW, IVF-PQ, DiskANN) · compression · storage internals · query processing · distributed architecture · system comparison · production ops | Active |
+| [Context Engineering](context-engineering/00-INDEX.md) | Context construction, budgeting, ordering, compression, retrieval-as-selection, security — CM-00 through CM-06 complete | Active |
+| [Agent Memory](agent-memory/00-INDEX.md) | Memory taxonomy, lifecycle, retrieval, real systems (Mem0, Letta, Zep), evaluation, security | Active |
+| [RAG in Production](rag-in-production/00-INDEX.md) | 12-category failure taxonomy, CITE-RAG architecture, hybrid search, sufficiency check, observability, production checklist | Active |
+
+---
+
+## How the Topics Relate
 
 ```mermaid
 flowchart TD
-  U[Current task / user request] --> C[Context Manager]
-  M[Agent Memory] -->|selected memories / candidates| C
-  R[Retrieval sources] -->|selected evidence| C
-  T[Tools and runtime data] --> C
-  C --> P[Serialized model input]
-  P --> L[LLM invocation]
-  L --> O[Response / tool call]
-  O --> X[Application execution]
-  X -->|optional memory write/update| M
+  VDB["Vector Databases\n(retrieval index)"]
+  CTX["Context Engineering\n(what the model receives now)"]
+  MEM["Agent Memory\n(persistence across sessions)"]
+  RAG["RAG in Production\n(retrieval pipeline)"]
+
+  VDB -->|"powers retrieval in"| RAG
+  RAG -->|"evidence feeds into"| CTX
+  MEM -->|"retrieved memories feed into"| CTX
+  CTX -->|"assembled payload sent to"| LLM["🤖 LLM Invocation"]
+  LLM -->|"output may trigger write to"| MEM
 ```
 
-**Boundary:** Context management decides what the model receives for this invocation. Agent memory decides what information persists and may be useful in future invocations. They are related, but they are not the same problem.
+**Boundaries that matter:**
+- Context management ≠ agent memory (different engineering problems)
+- Retrieval is an *input source* to context assembly — not the same as context management
+- A stored memory is *not* automatically in context — retrieval + injection required
+
+---
+
+*Last updated: 2026-11-11*
