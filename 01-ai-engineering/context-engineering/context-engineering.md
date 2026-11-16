@@ -1,6 +1,6 @@
 # Context Engineering: A Field Note for AI Engineers
 
-> **Field Note CM-00 → CM-06** | Author: Personal Reference | Status: Living Document
+> **Field Note CM-00 → CM-14** | Author: Personal Reference | Status: Living Document (reference coverage is not proof of hands-on completion)
 
 ---
 
@@ -171,20 +171,20 @@ flowchart TD
 ```
 usable_input = context_window - output_reserve - safety_margin
 
-Example (Claude Sonnet 4.5):
+Example (illustrative 200k-token model; not a current provider specification):
   200,000 total
 −   8,192 output reserve
 −   2,048 safety margin
 = 189,760 usable input tokens
 ```
 
-These are **three different numbers**. `context_window` is the total. The API won't let you use all of it for input. Build your budget calculator accordingly.
+These are **three different planning numbers**. Some APIs advertise separate maximum input and output limits; others enforce a combined window or model-specific constraints. Query each model's documented limits. The arithmetic here is an illustrative *application policy*, not a universal API rule.
 
 ### Token Counting Reality
 
 Character count ≠ token count. This burns everyone once.
 
-**BPE intuition** (Byte Pair Encoding, used by GPT-family and many others):
+**Tokenizer intuition** (illustrative pieces only: actual splitting and token IDs vary by tokenizer):
 
 ```
 "the"           → [1 token]
@@ -208,7 +208,7 @@ Code is more token-dense than prose:
 | HuggingFace `AutoTokenizer` | Open-source models (Llama, Mistral, etc.) |
 
 > [!WARNING]
-> **Never** estimate token count from character count in production. A document that's 10,000 characters could be anywhere from 2,000 to 6,000 tokens depending on content type. Use the actual tokenizer.
+> **Never rely solely** on a character-count heuristic for production admission control. A document that's 10,000 characters could be anywhere from 2,000 to 6,000 tokens depending on content type. Use the actual tokenizer.
 
 ### Overflow Strategies
 
@@ -220,7 +220,7 @@ Code is more token-dense than prose:
 | **Retrieval-based Selection** | Re-select most relevant chunks | Low — intelligent filtering | Best for evidence layers |
 | **Hierarchical Loading** | Load summaries first, expand on demand | Very low | Multi-document tasks |
 
-**Priority order when you must cut**:
+**Priority order when you must cut** (illustrative; protect user intent, safety-critical constraints and required evidence; never silently drop essential facts):
 
 ```
 Protected (never cut):       System Instructions, Current Request
@@ -402,7 +402,7 @@ queries = [
 
 | Technique | When to Use | Cost |
 |---|---|---|
-| **Rewriting** | Always — conversation queries need it | Low (1 LLM call) |
+| **Rewriting** | When references or ambiguity require it | Low (1 LLM call) |
 | **Expansion** | Specialized domains with synonyms | Low (keyword lookup) |
 | **Decomposition** | Multi-faceted complex queries | Medium (1 LLM call) |
 | **Multi-query** | Ambiguous queries, recall-critical tasks | Medium (N retrievals) |
@@ -430,7 +430,7 @@ MMR(d) = λ · Sim(d, q) − (1 − λ) · max_{s ∈ S} Sim(d, s)
 
 - `λ = 1.0` → pure relevance (standard top-K behavior)
 - `λ = 0.0` → pure diversity (maximum spread)
-- `λ = 0.5–0.7` → typical production setting
+- `λ = 0.5–0.7` → an experiment range, not an established production default
 
 MMR iteratively picks the next document that maximizes relevance while penalizing redundancy with already-selected documents.
 
@@ -472,7 +472,7 @@ Freshness constraint:  SOFT
 ```
 
 > [!CAUTION]
-> **Never let relevance scores determine authorization.** A document that scores 0.95 relevance but belongs to another tenant must be excluded before scoring. Apply authorization as a pre-filter, not a re-ranking penalty.
+> **Never let relevance scores determine authorization.** A document that scores 0.95 relevance but belongs to another tenant must not be eligible for retrieval/ranking. Enforce authorization in the data layer, not merely in a prompt. Apply authorization as a pre-filter, not a re-ranking penalty.
 
 ---
 
@@ -610,18 +610,18 @@ Production "model failure" taxonomy:
                     ┌─────────────────────────────────────────┐
    "The model       │   What actually happened:               │
     is bad at X"    │                                         │
-        │           │   95% Context failure                   │
+        │           │   Context failures (measure per system)                   │
         │           │    ├─ Evidence not in context           │
         │           │    ├─ Evidence in wrong position        │
         │           │    ├─ Evidence buried by distractors    │
         │           │    ├─ Wrong retrieval results           │
         │           │    └─ Budget overflow / silent truncate │
         │           │                                         │
-        │           │   5% Actual model capability gap        │
+        │           │   Actual model capability gaps also exist        │
         └───────────┘                                         
 ```
 
-**Key insight: Most "model failures" in production are context failures. The model can't use what it wasn't given.**
+**Key insight:** Many apparent model failures may originate in retrieval, selection, formatting, truncation or tool results. There is no defensible universal percentage; diagnose each failure using traces and controlled tests.
 
 ### Diagnostic Table
 
@@ -728,10 +728,10 @@ Attack pattern:
 
 | Mitigation | Mechanism | Strength |
 |---|---|---|
-| **Label untrusted content** | Wrap retrieved docs: `<external_document>` tags | Medium |
-| **Structured separation** | Use message roles to separate instructions from evidence | Medium |
-| **Don't concatenate raw** | Never `system_prompt + retrieved_text` without clear structural separation | Required |
-| **Instruction re-assertion** | Re-state key instructions after evidence block | Medium |
+| **Label untrusted content** | Mark retrieved content as data, not commands | Defense-in-depth |
+| **Structured separation** | Use proper message roles/content parts and explicit trust labels | Defense-in-depth |
+| **Don't concatenate raw** | Preserve provenance and separation of instructions and source data | Defense-in-depth |
+| **Instruction re-assertion** | May help but cannot enforce security policy | Weak alone |
 | **Input sanitization** | Strip or flag instruction-pattern strings from retrieved content | Low (bypassable) |
 
 **Tenant Leakage**
@@ -771,6 +771,293 @@ budget_allocation = {
 
 ---
 
+
+## CM-07 — Tool Context and Progressive Disclosure: Production Design
+
+The progressive-disclosure overview above covers the idea; production engineering adds *tool identity, authorization, lifecycle, and execution safety*.
+
+### Catalog, selection, schema materialization, execution
+
+```mermaid
+flowchart LR
+    Q[User task] --> A[Authorized tenant-scoped catalog]
+    A --> S[Tool discovery / selection]
+    S --> L[Load exact schemas]
+    L --> M[Model proposes calls]
+    M --> P[Validate arguments + policy]
+    P --> E[Execute with bounded credentials]
+    E --> R[Sanitize + budget tool result]
+    R --> M
+```
+
+1. **Registry** stores tool identity, namespace, version, owner, schema, permissions, risk class and lifecycle state. Names alone are insufficient.
+2. **Toolsets** group related capabilities; select a task-specific authorized subset. In a multi-tenant system, visibility is evaluated with the user, tenant, action and resource.
+3. **Discovery** can use deterministic routing, lexical search, embedding search or policy-constrained model selection. Evaluate false exclusions as well as token savings.
+4. **Schema loading** exposes only the necessary contracts for the current step. Model-visible schemas are *not* authorization.
+5. **Execution** revalidates authorization and arguments at call time, applies timeouts, idempotency and approvals, and scopes credentials to the action.
+6. **Tool result handling** truncates or paginates noisy responses without silently removing required data; mark all retrieved and tool-originated text as potentially untrusted.
+7. **Schema/prefix caching** can reduce repeated processing cost if provider rules allow it; avoid changing large stable prompt prefixes unnecessarily.
+
+**When it is not worth it:** for 5 small tools, discovery adds latency and failure paths. Measure tool-choice accuracy, missing-tool rate, tool schema tokens, tool-call correctness, latency and denied unauthorized calls before introducing a sophisticated registry.
+
+**Harness boundary:** Context management handles which capabilities and results the model sees. The *harness* also owns scheduling, execution, retries, permissions, checkpoints and observability. The two overlap but are not synonyms.
+
+---
+
+## CM-08 — Context Compression, Compaction and Loss Accounting
+
+Compression is not the same as summarization, and prompt caching is not compression:
+
+| Method | What changes? | Information loss | Typical use |
+|---|---|---|---|
+| Deduplication | Removes repeated material | Can be low if equivalence is verified | Overlapping chunks / repeated results |
+| Selection | Omits irrelevant candidates | Potentially task-critical omissions | Documents and tool responses |
+| Extractive compression | Keeps exact passages/facts | Misses excluded passages | Evidence preservation |
+| Abstractive summary | Rewrites information into shorter text | Can hallucinate or omit qualifiers | Older conversations |
+| Structured state checkpoint | Saves explicit fields and artifacts | Loses anything not represented | Long-running agents |
+| Prompt caching | Reuses computation for identical prefixes | No deliberate loss of input information | Repeated instructions and documents |
+
+**Compaction trigger:** Set a soft budget below the provider maximum; compact before execution runs out of room, not only after a 400 error. A long-horizon task should checkpoint goals, decisions, requirements, file paths, pending work, unresolved errors, exact citations and verification status.
+
+**Never summarize away:** credentials/permissions state, exact code diffs, requirements that must be met, error identifiers, source provenance, transaction IDs or uncertainty flags. Store exact artifacts separately and reference them by identifier.
+
+**Loss test:** Give an agent a task before and after compaction, then check whether it still knows requirements, completed work, pending actions and source evidence. Measure compression ratio *and* downstream task accuracy.
+
+---
+
+## CM-09 — Execution Context and State Handoffs
+
+A context window is **not** durable task state. For an agent running for hours or days, put operational truth in a database/filesystem/workflow engine and reconstruct compact model context at each step.
+
+```mermaid
+flowchart TD
+    J[Durable job state] --> A[Context assembler]
+    D[Documents / retrieval] --> A
+    T[Tool result references] --> A
+    A --> M[Model invocation]
+    M --> V[Validate proposed action]
+    V --> E[Tool executor]
+    E --> C[Transactional checkpoint / event log]
+    C --> J
+```
+
+Suggested persisted checkpoint schema:
+
+```json
+{
+  "job_id": "job-123",
+  "tenant_id": "tenant-A",
+  "goal": "Ship API integration",
+  "requirements": ["Preserve backwards compatibility"],
+  "completed_steps": ["Mapped endpoints"],
+  "pending_steps": ["Add contract tests"],
+  "artifacts": [{"path": "src/client.go", "revision": "git-sha"}],
+  "last_verified_state": "tests passing at git-sha",
+  "open_questions": ["Does staging use v2 auth?"],
+  "tool_call_ids": ["call-456"],
+  "checkpoint_version": 3
+}
+```
+
+Only persist non-secret references to credentials; load credentials from a secure runtime. Checkpoints must be versioned. On restart: validate current environment and artifact revisions; do not simply trust an old summary. Design for tool retries, idempotency, partial failures and concurrent workers.
+
+---
+
+## CM-10 — Multi-Agent Context Transfer
+
+Multiple agents do not automatically improve reasoning. They add *context transfer boundaries*.
+
+| Handoff mode | Benefit | Failure |
+|---|---|---|
+| Full history | High fidelity | Token explosion, contamination and role confusion |
+| Short summary | Cheap | Missing requirements, evidence or uncertainty |
+| Structured brief + artifact refs | Inspectable and bounded | Requires schema and validation |
+| Shared workspace with scoped reads | Reusable source of truth | Stale/concurrent changes and permissions |
+
+**Recommended contract:** task objective, explicit non-goals, constraints, evidence references, current artifacts/versions, decisions, blockers, allowed capabilities, desired output, success tests and confidence/uncertainty.
+
+The receiving agent should verify artifact versions and permissions independently. Shared context must preserve tenant boundaries. Evaluate handoffs against a single-agent baseline: accuracy, latency, token use, regressions and error propagation.
+
+---
+
+## CM-11 — Context Observability and Failure Diagnosis
+
+Log a **replayable manifest**, not raw sensitive prompts by default.
+
+| Span | Record |
+|---|---|
+| Query processing | Input/query versions, rewrite decisions |
+| Retrieval | Filters, candidate IDs, ranker version |
+| Selection | Selected/excluded IDs and reasons, coverage estimate |
+| Assembly | Message order, token budget, component sizes |
+| Invocation | Model/version, API params, actual usage, caching |
+| Tooling | Offered schemas, tool-call IDs, latencies, denials |
+| Compaction | Trigger, old/new token counts, preserved references |
+| Answer | Evidence IDs, citations, validation result |
+
+Production redaction: store hashes, encrypted restricted payloads or reproducible ID references based on data classification and retention policy. **Do not indiscriminately log full user text, PII, secrets, proprietary documents or access tokens.**
+
+Diagnostic experiment: hold model/prompt fixed; rerun with (a) oracle evidence, (b) shuffled ordering, (c) no distractors, and (d) different compaction states. This helps separate retrieval, selection, ordering, compression and model capability issues.
+
+---
+
+## CM-12 — Context Security and Trust Boundaries
+
+The threat model above is the beginning, not the security policy.
+
+- **Authority separation:** system/developer instructions are trusted policy; retrieved pages, tool outputs, repository files and user-uploaded documents are untrusted *data*. Do not follow instructions embedded in lower-trust data.
+- **Authorization in code:** tenant and user permissions apply before data access *and again* at tool execution. Prompt instructions and schema hiding cannot enforce isolation.
+- **Source poisoning:** an attacker can alter retrieved content or metadata to bias the assembled context; capture provenance, access labels and source revisions.
+- **Tool-output injection:** command output, web pages and search snippets may contain adversarial instructions. Treat results as evidence, not commands.
+- **Exfiltration paths:** outgoing email, HTTP requests, database writes and command execution require resource-scoped policy and, where appropriate, explicit approval.
+- **Budget denial of service:** large attachments or tool results can exhaust token budgets or costs; impose byte, token, time and iteration caps.
+- **Prompt/log privacy:** encrypt or minimize stored transcripts, enforce retention and avoid secrets in prompts.
+
+Attack tests must verify **outcomes** (unauthorized read blocked, secret not disclosed, destructive action not executed), not just whether the model verbally rejects an injection. XML tags and instruction reminders help organization, but are not security boundaries.
+
+---
+
+## CM-13 — Evaluation: Does Context Actually Help?
+
+Distinguish **retrieval success**, **selection success**, **model utilization**, **task success**, **security** and **economics**.
+
+| Test family | Controlled experiment | Main metrics |
+|---|---|---|
+| Position robustness | Move required fact among beginning/middle/end | Task correctness by position |
+| Length sensitivity | 8k/32k/128k/256k/1M where supported | Correctness, latency, cost |
+| Evidence coverage | Hide one necessary fact among duplicates | Fraction of required evidence included |
+| Multi-hop | Two linked facts across sources | End-to-end answer accuracy |
+| Tool discovery | 10 vs 100 vs 1,000 possible tools | Correct tool selected, token cost |
+| Compaction | Run before/after checkpoint | State fidelity, task completion |
+| Multi-agent handoff | Full transcript vs structured brief | Completion and omitted constraints |
+| Security | Cross-tenant and poisoned-source cases | Leakage / unauthorized tool-use rate |
+| Economic | Cached vs uncached, compact vs full context | Total request cost and p95 latency |
+
+**Benchmark caveats:** NIAH tests retrieval of isolated facts, not the whole capacity to reason over large inputs. LongBench and RULER capture a wider set of tasks, but your production tasks still require their own golden test cases.
+
+Use a fixed benchmark corpus and task set; version model, documents, tools and selectors. Report sample size, cost, latency, error bars and failures instead of universal percentage claims. **Never present synthetic illustrative curves as measured benchmark results.**
+
+---
+
+## CM-14 — Production Architecture and Capstone
+
+```mermaid
+flowchart TB
+    U[User / job] --> G[AuthN + AuthZ gate]
+    G --> O[Task orchestrator]
+    O --> Q[Query understanding / tool discovery]
+    Q --> R[Authorized retrieval]
+    Q --> T[Authorized tool catalog]
+    R --> S[Evidence selector]
+    T --> S
+    S --> B[Token-aware context assembler]
+    H[Conversation + state checkpoints] --> B
+    B --> M[Model API / model router]
+    M --> V[Output and tool-action validator]
+    V --> X[Tool execution / approvals]
+    X --> H
+    M --> OBS[Trace + evaluation]
+    S --> OBS
+    B --> OBS
+    X --> OBS
+```
+
+**Capstone: Context-Managed Long-Horizon Agent**
+
+Build an agent that can solve a multi-step engineering task while surviving context exhaustion, interruptions, failures and safe handoffs. Implement:
+1. Model capability registry: limits, pricing, availability, tokenizer/count API, caching and modality.
+2. Scoped retrieval and tool registry with progressive disclosure.
+3. Explicit evidence coverage, deduplication, ranking and token-budgeted selection.
+4. Reproducible serialized context manifest and safe observability.
+5. Compaction with typed durable checkpoints and recovery from restart.
+6. Tool-call validation, policy enforcement, bounded retries and idempotency.
+7. An evaluation harness to compare lean context, 100k+ context, and up to 1M where supported and affordable.
+
+**Definition of done:** Real test results for correctness, context tokens, wall-clock latency, provider cost, injection resistance, failure recovery, cache hit rate and correctness after compaction. Treat anything not yet implemented as *design*, not accomplishment.
+
+---
+
+## 1M-Token Context Windows: What Changes in Production? (November 2026)
+
+**Direct answer:** Several current offerings support **approximately one million tokens**, but *not every model or API deployment does*. A large advertised capacity is a maximum acceptance limit, **not evidence that models use every token reliably**, or that million-token calls are economical.
+
+### Check provider/model/endpoint, not just brand
+
+| Provider | Verified example or policy | Qualification |
+|---|---|---|
+| Google Gemini | Gemini 2.5 Pro documents 1,048,576 input tokens and 65,536 output tokens; Google describes many newer models with 1M+ windows. | Some 2.5 access is now restricted for new projects; check the model's current endpoint and status. |
+| Anthropic Claude | Anthropic documents 1M context for several latest Claude models on Amazon Bedrock. | Window and rollout depend on the specific Claude model and hosting platform. |
+| OpenAI | Pricing documentation distinguishes short-context and long-context tiers for current model families. | Do not infer a universal 1M limit from a pricing tier; verify the exact model card and API response restrictions. |
+
+These are **time-stamped examples**, not a guarantee of access on every account. See provider sources below.
+
+### Capacity vs utilization vs economics
+
+1. **Capacity:** How much input the API accepts (plus separate or shared output allowance).
+2. **Utilization:** Whether the model correctly locates, combines and obeys task-relevant details at that length.
+3. **Economics:** Price, caching terms, prefill latency, rate limits, throughput, availability, and lost work on retries.
+4. **Modality:** Images, audio, video, tools and structured parts can consume budget differently than plain text.
+5. **Effective window:** A harness typically imposes a smaller working budget than the maximum, leaving room for tool outputs, unexpected expansion and response tokens.
+
+**A million-token window is headroom, not a target utilization rate.**
+
+### Production decision policy
+
+```text
+Request arrives
+  -> enforce tenant/user permissions and per-job spend cap
+  -> determine task type + required evidence coverage
+  -> retrieve or load authoritative artifacts
+  -> estimate/count actual input tokens for chosen model
+  -> select the smallest evidence-complete context
+  -> retain stable prefix for cache friendliness
+  -> reserve output, tool-loop and safety budget
+  -> if larger context genuinely helps, route to compatible long-context model
+  -> invoke with tracing and explicit timeout/retry policy
+  -> evaluate answer/evidence correctness; persist durable task state
+```
+
+**When full/very-long context can be reasonable:** detailed repository-level analysis, complex legal or technical document review, multi-document comparisons with cross-document dependencies, and multimodal synthesis where selection might delete necessary links.
+
+**When not:** short Q&A, standard search-based support, routine tool execution or a task with easily isolated evidence. Bigger windows are not a replacement for authorization, search, checkpointing or evaluation.
+
+### Cost and latency example (hypothetical)
+
+If 1,000,000 uncached input tokens cost $2 per million, **each input alone costs $2**. A 10-step agent repeatedly sending the same full input could incur ~$20 in input billing before outputs, reasoning, tool calls or retries. Caching may materially lower this, but only if eligible repeated prefixes actually hit the provider's cache. Provider-specific long-context pricing and thresholds may raise cost above the simple example.
+
+For a more realistic estimate, calculate:
+```text
+total_cost =
+  uncached_input_tokens * uncached_price_per_token
++ cached_read_tokens * cached_read_price_per_token
++ cache_writes * write_price_per_token
++ output_tokens * output_price_per_token
++ any cache storage or tool charges
+```
+
+**Prompt caching != persistent memory:** caches speed or discount repeated content; they do not grant the model durable cross-session knowledge. Cache-hit strategy often relies on stable prefixes. Changing system text, tool ordering or early documents may lose reuse.
+
+### Operational policies to benchmark
+
+- **Lean path:** relevant chunks, minimal authorized schemas, durable state summary; default for routine steps.
+- **Expanded path:** larger document sections/repository slices when evidence coverage is insufficient.
+- **Long-context path:** full relevant corpus only when its interdependencies matter and a task benchmark shows a gain.
+- **Recovery path:** persist checkpoints and exact artifacts; restart with fresh compact context rather than endlessly replaying raw history.
+
+Record input tokens, cached tokens, output tokens, time to first token, end-to-end latency, tool retries, dollars per successful task and accuracy by context length. Run the *same tasks* through lean, expanded and long-context variants; do not assume the biggest wins.
+
+### Current official documentation
+
+- Google model example: https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro
+- Google long-context guide: https://ai.google.dev/gemini-api/docs/long-context
+- Google pricing and long-input thresholds: https://ai.google.dev/gemini-api/docs/pricing
+- Google caching guide: https://ai.google.dev/gemini-api/docs/caching
+- Anthropic Claude on Bedrock: https://docs.anthropic.com/en/api/claude-on-amazon-bedrock
+- Anthropic prompting and long-horizon agents: https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-templates-and-variables
+- OpenAI pricing and context tiers: https://platform.openai.com/pricing/
+
+---
+
 ## Key Principles
 
 > [!IMPORTANT]
@@ -798,8 +1085,8 @@ budget_allocation = {
 > Optimize for task utility of the selected set, not for filling the context window. Distractor documents actively degrade performance.
 
 > [!IMPORTANT]
-> **7. Most "model failures" are context failures**
-> Before blaming the model, log what the model actually received. The answer to "why did the model get this wrong?" is usually found in the context payload.
+> **7. Check for context failures before blaming the model**
+> Before blaming the model, log what the model actually received. The payload, tool traces and retrieval decisions are essential evidence, but model capability can also be the cause.
 
 ---
 
@@ -819,4 +1106,4 @@ budget_allocation = {
 
 ---
 
-*Last updated: 2026-11-11 | Field notes CM-00 through CM-06*
+*Last updated: 2026-11-16 | Reference material CM-00 through CM-14; hands-on completion tracked separately*
