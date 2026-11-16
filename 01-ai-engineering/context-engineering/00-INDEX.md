@@ -1,16 +1,39 @@
 # Context Engineering — Field Notes Index
 
-> **Scope:** How an AI application constructs, budgets, orders, and manages the information sent to a model for each invocation. This is the application-layer engineering problem — not RAG, not agent memory, not inference serving.
+> **Scope:** How AI applications select, structure, budget, secure, observe and manage information presented to a model at inference time. Retrieval, agent memory and inference serving are related disciplines with distinct responsibilities.
 >
-> **Status:** CM-00 through CM-06 completed and distilled into the blog. CM-07 onwards in progress.
+> **Learning status:** CM-00–CM-06 covered in our learning sessions. CM-07–CM-14 have reference notes, **not yet completed as lessons or validated experimentally**.
 
 ---
 
-## The One Document
+## Main Deep Dive
 
-| File | What it covers | Read time |
-|------|---------------|-----------|
-| [context-engineering.md](context-engineering.md) | Full depth: what context engineering is (and isn't) → the 6-layer context stack → token budget arithmetic → position effects (Lost in the Middle) → long context utilization (LongBench, RULER) → retrieval as context selection (MMR, coverage) → progressive disclosure → compression (LLMLingua) → debugging context failures → security (prompt injection, tenant leakage) | ~45 min |
+[**Context Engineering: A Field Note for AI Engineers**](context-engineering.md) — a conceptual, research-informed treatment of context-window behavior, evidence selection, tool context, compaction, execution handoffs, security, evaluation and production engineering. No tutorial code is required.
+
+**Source review:** Reassessed against [rohitg00/ai-engineering-from-scratch — Context Engineering](https://github.com/rohitg00/ai-engineering-from-scratch/blob/main/phases/11-llm-engineering/05-context-engineering/docs/en.md). The blog retains useful original explanations and supplements gaps in few-shot context, dynamic assembly, replay, contextual retrieval, token-level inference costs and long-context deployment.
+
+---
+
+## Quick Navigation
+
+| Question | Blog section |
+|---|---|
+| What is context engineering, and how is it different from memory and RAG? | [Definition and boundaries](context-engineering.md#what-is-context-engineering) |
+| Which inputs form the active context? | [Six source layers](context-engineering.md#the-context-stack-six-layers) |
+| How should I allocate context and generation headroom? | [Token budgets](context-engineering.md#token-budgets--the-hard-constraint) |
+| What is lost in the middle? | [Position effects](context-engineering.md#position-effects--where-you-put-it-matters) |
+| Why does a large context window not guarantee accuracy? | [Long-context utilization](context-engineering.md#long-context--the-utilization-problem) |
+| How do retrieval and evidence selection differ? | [Retrieval as selection](context-engineering.md#retrieval-as-context-selection) |
+| How can agents load only relevant tools? | [CM-07: Tool context](context-engineering.md#cm-07--tool-context-and-progressive-disclosure) |
+| How does compaction preserve a task? | [CM-08: Compaction](context-engineering.md#cm-08--context-compression-compaction-and-loss-accounting) |
+| How should execution context persist across turns? | [CM-09: Checkpoints](context-engineering.md#cm-09--execution-context-and-state-handoffs) |
+| What should pass between collaborating agents? | [CM-10: Handoffs](context-engineering.md#cm-10--multi-agent-context-transfer) |
+| How do we trace and debug context failures? | [CM-11: Observability](context-engineering.md#cm-11--context-observability-and-failure-diagnosis) |
+| How are prompt injections and tenant leaks prevented? | [CM-12: Security](context-engineering.md#cm-12--context-security-and-trust-boundaries) |
+| How do we measure whether a strategy improves accuracy? | [CM-13: Evaluation](context-engineering.md#cm-13--evaluation-does-context-actually-help) |
+| What should a production context manager contain? | [CM-14: Architecture](context-engineering.md#cm-14--production-architecture-and-capstone) |
+| Do 1M-token windows make selection unnecessary? | [1M-token production realities](context-engineering.md#1m-token-context-windows-what-changes-in-production-november-2026) |
+| What was missing from the external reference comparison? | [Cross-reference review](context-engineering.md#cross-reference-review-missing-concepts-and-production-considerations) |
 
 ---
 
@@ -18,56 +41,51 @@
 
 ```mermaid
 flowchart LR
-  SRC["6 Source Types\n(instructions · tools · evidence\n· history · request · state)"]
-  SRC --> ASSEMBLE["Assembly Pipeline\nFilter → Budget → Order → Serialize"]
-  ASSEMBLE --> LLM["🤖 LLM Invocation"]
-  LLM --> OUT["Response / Tool Call"]
+  SRC["Authorized input sources: instructions, tools, evidence, history, request, state"] --> A["Select → Budget → Order → Serialize"]
+  A --> M["Model invocation"]
+  M --> R["Response / tool proposal"]
+  R --> H["Validated execution + durable checkpoint"]
+  H --> SRC
 ```
 
-**Key boundary:**
-- **Context management** = what the model receives *now* (this invocation)
-- **Agent memory** = what persists *across* invocations → see [agent-memory](../agent-memory/00-INDEX.md)
-- **Retrieval / RAG** = one *input source* to context assembly → see [rag-in-production](../rag-in-production/00-INDEX.md)
+- **Context management** manages the model's active input for an invocation.
+- **Agent memory** stores and retrieves information across invocations or sessions; see [agent-memory](../agent-memory/00-INDEX.md).
+- **RAG** retrieves possible evidence for context selection; see [rag-in-production](../rag-in-production/00-INDEX.md).
+- **Inference serving** handles model execution, attention computation, KV caching, scheduling and associated latency. Context engineering affects its workload but is not identical to it.
+- **Harness engineering** additionally includes execution, policy enforcement, retries, state orchestration and operational safeguards.
 
 ---
 
-## Fast-Access: Question → Section
+## Curriculum and Learning Status
 
-| If asked… | Jump to |
-|-----------|---------|
-| What exactly is context engineering? | [§1 Definition](context-engineering.md#1-what-is-context-engineering) |
-| What are the 6 source types? | [§2 Context Stack](context-engineering.md#2-the-context-stack-six-layers) |
-| How do I calculate the token budget? | [§3 Token Budgets](context-engineering.md#3-token-budgets--the-hard-constraint) |
-| Does position in context affect answers? | [§4 Position Effects](context-engineering.md#4-position-effects--where-you-put-it-matters) |
-| Does a 100k context window mean 100k usable? | [§5 Long Context](context-engineering.md#5-long-context--the-utilization-problem) |
-| What is MMR and evidence coverage? | [§6 Retrieval as Selection](context-engineering.md#6-retrieval-as-context-selection) |
-| How do I avoid loading 50 tool schemas? | [§7 Progressive Disclosure](context-engineering.md#7-progressive-disclosure--dont-load-what-you-dont-need) |
-| What is LLMLingua and when to use it? | [§8 Compression](context-engineering.md#8-context-compression) |
-| How do I debug when the model ignores evidence? | [§9 Context Failures](context-engineering.md#9-context-failures--debugging) |
-| How do I prevent prompt injection? | [§10 Security](context-engineering.md#10-context-security) |
+| ID | Topic | Learning status | Reference in blog |
+|---|---|---|---|
+| CM-00 | Foundations and terminology | ✅ Covered | Definition and boundaries |
+| CM-01 | Context construction and assembly | ✅ Covered | Context stack and pipeline |
+| CM-02 | Tokenization, budgets and windows | ✅ Covered | Token budgets and 1M windows |
+| CM-03 | Position effects | ✅ Covered | Lost in the Middle |
+| CM-04 | Long-context behavior | ✅ Covered | LongBench and RULER |
+| CM-05 | Retrieval as context selection | ✅ Covered | Retrieval, ranking and evidence |
+| CM-06 | Relevance and selection policies | ✅ Covered | MMR, coverage, metadata and constraints |
+| CM-07 | Tool context and progressive disclosure | ▶ Next | Conceptual reference available |
+| CM-08 | Compression and compaction | Planned | Conceptual reference available |
+| CM-09 | Execution context and state handoffs | Planned | Conceptual reference available |
+| CM-10 | Multi-agent context transfer | Planned | Conceptual reference available |
+| CM-11 | Observability and debugging | Planned | Conceptual reference available |
+| CM-12 | Security and trust boundaries | Planned | Conceptual reference available |
+| CM-13 | Evaluation and benchmarks | Planned | Conceptual reference available |
+| CM-14 | Production architecture and capstone | Planned | Conceptual reference available |
 
----
-
-## Completed Modules (Learning Log)
-
-| Module | Topic | Status |
-|--------|-------|--------|
-| CM-00 | Foundations: context vs. memory vs. retrieval vs. KV cache | ✅ |
-| CM-01 | Context construction and assembly pipeline | ✅ |
-| CM-02 | Tokenization, budgets, context windows | ✅ |
-| CM-03 | Context ordering and position effects (Lost in the Middle) | ✅ |
-| CM-04 | Long-context utilization (LongBench, RULER) | ✅ |
-| CM-05 | Retrieval as context selection | ✅ |
-| CM-06 | Evidence coverage, MMR, budget-aware selection | ✅ |
-| CM-07 | Tool context and progressive disclosure | 🔄 Next |
-| CM-08 | Context compression and compaction | Planned |
-| CM-09 | Execution context and state handoff | Planned |
-| CM-10 | Multi-agent context transfer | Planned |
-| CM-11 | Context observability and debugging | Planned |
-| CM-12 | Context security and trust boundaries | Planned |
-| CM-13 | Evaluation and benchmarks | Planned |
-| CM-14 | Production architecture capstone | Planned |
+**Progress:** 7/15 lessons covered, 8 remaining. Document coverage ≠ mastery or experimentally verified results.
 
 ---
 
-*Last updated: 2026-11-11*
+## Review Notes and Evidence Standards
+
+- Preserve **model context capacity vs effective utilization vs production economics** as separate concepts.
+- Treat positions, compression ratios and token savings as **model/task-dependent**, not universal constants.
+- Keep historical research results distinct from current provider/model limits; check official docs before deployment.
+- Require actual evaluation before claiming that MMR, contextual retrieval, progressive disclosure, compaction or 1M context improves a particular product.
+- No tutorial code is needed in this conceptual article; architecture diagrams, equations and concrete scenarios remain appropriate.
+
+*Last reviewed: 2026-11-16*
