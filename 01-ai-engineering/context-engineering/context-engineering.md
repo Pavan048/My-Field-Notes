@@ -9,8 +9,8 @@
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                                                                      │
-│   The model only knows what you give it right now.                  │
-│   The application's job is engineering that "right now."            │
+│   The model operates on the input provided to this invocation, together with what it learned during training.                  │
+│   The application's job is engineering that invocation's active information.            │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -166,7 +166,7 @@ flowchart TD
     style SM fill:#4a3a1a,color:#e0e0e0,stroke:#aa8844
 ```
 
-**The budget calculation**:
+**Illustrative budget calculation**:
 
 ```
 usable_input = context_window - output_reserve - safety_margin
@@ -188,14 +188,9 @@ Character count ≠ token count. This burns everyone once.
 
 ```
 "the"           → [1 token]
-"embedding"     → ["embed" + "ding"] → [2 tokens]
-"embeddings"    → ["embed" + "dings"] → [2 tokens]
-"unembeddable"  → ["un" + "embed" + "dable"] → [3 tokens]
+"embedding", "embeddings" and related terms can tokenize differently by model; splits shown elsewhere are not guaranteed.
 
-Code is more token-dense than prose:
-  json key-value pairs → ~1.5× tokens vs equivalent English
-  Base64 strings       → ~1.3 chars/token (expensive!)
-  Whitespace/indent    → Each space may be its own token in some tokenizers
+Tokenization varies substantially by language, code, JSON, punctuation, whitespace, base64 and tokenizer. Check actual model-specific counts.
 ```
 
 **Practical rule**: use the model family's tokenizer at the API boundary.
@@ -216,9 +211,9 @@ Code is more token-dense than prose:
 |---|---|---|---|
 | **Truncation** | Cut off tail content | **High** — silent evidence loss | Never for evidence; acceptable for history tail |
 | **Sliding Window** | Drop oldest turns | Medium — loses early context | Simple chatbots with shallow task memory |
-| **Summarization / Compaction** | LLM summarizes earlier history | Low-medium — lossy but intentional | Long conversations, agentic workflows |
-| **Retrieval-based Selection** | Re-select most relevant chunks | Low — intelligent filtering | Best for evidence layers |
-| **Hierarchical Loading** | Load summaries first, expand on demand | Very low | Multi-document tasks |
+| **Summarization / Compaction** | LLM summarizes earlier history | Potentially high — summaries can omit key constraints | Long conversations, agentic workflows |
+| **Retrieval-based Selection** | Re-select most relevant chunks | Variable — relevant evidence may be missed | Best for evidence layers |
+| **Hierarchical Loading** | Load summaries first, expand on demand | Variable — summaries may hide required detail | Multi-document tasks |
 
 **Priority order when you must cut** (illustrative; protect user intent, safety-critical constraints and required evidence; never silently drop essential facts):
 
@@ -247,9 +242,9 @@ Performance vs. Position in Context:
                         Position
 ```
 
-**The finding** from [Liu et al. 2023](https://arxiv.org/abs/2307.03172) (*Lost in the Middle*): In multi-document QA and key-value retrieval tasks, language models exhibit **U-shaped performance** — they utilize information near the beginning and end of context significantly better than information in the middle.
+**A finding** from [Liu et al. 2023](https://arxiv.org/abs/2307.03172) (*Lost in the Middle*): In multi-document QA and key-value retrieval tasks, language models exhibit **U-shaped performance** — they utilize information near the beginning and end of context significantly better than information in the middle.
 
-This was measured across GPT-3.5-turbo, GPT-4, Claude-v1.3, and several open-source models. The effect was consistent and statistically significant.
+This was measured across GPT-3.5-turbo, GPT-4, Claude-v1.3, and several open-source models. The degree of this position effect varies by model and evaluation setup.
 
 ### Practical Ordering Rules
 
@@ -280,7 +275,7 @@ The paper is real and the effect is real, but over-extrapolating it is a common 
 ```
 NIAH Test (what most benchmarks use):
   "Find this single fact buried at position X in the context."
-  → Models score near 100% at 128k tokens
+  → Some models do well at some tested lengths, depending on setup
   → Conclusion: "Models handle long context!"
 
 RULER Tasks (what actually matters):
@@ -289,7 +284,7 @@ RULER Tasks (what actually matters):
   Multi-needle:         Multiple relevant facts, some distractors
   Long summarization:   Synthesize across the full document
 
-  → Models degrade sharply on these at >32k tokens
+  → Models can degrade on harder variants; exact thresholds vary
   → The "long context" capability is shallower than NIAH suggests
 ```
 
@@ -299,17 +294,9 @@ RULER Tasks (what actually matters):
 
 ## Long Context — The Utilization Problem
 
-```mermaid
-xychart-beta
-    title "Task Performance vs Context Length"
-    x-axis ["8k", "16k", "32k", "64k", "128k"]
-    y-axis "Relative Performance (%)" 0 --> 100
-    line [95, 92, 88, 83, 79]
-    line [90, 82, 70, 55, 40]
-    line [85, 75, 60, 45, 30]
-```
+**Conceptual—not measured—relationship:** As context grows, tasks can become harder because useful evidence competes with distractors and multi-hop relationships span distant positions. The size and direction of degradation depend on the model, task and dataset. Use benchmark tables with actual numbers rather than illustrative performance percentages.
 
-> *Approximate illustration of degradation curves: single-doc QA (top), multi-doc QA (middle), multi-hop reasoning (bottom). Based on trends from [Bai et al. 2023](https://arxiv.org/abs/2308.14508) LongBench and [Hsieh et al. 2024](https://arxiv.org/abs/2404.06654) RULER.*
+
 
 **Core distinction: context capacity ≠ context utilization.**
 
@@ -377,28 +364,12 @@ sequenceDiagram
 
 Conversational queries are terrible retrieval queries. Transform them first.
 
-```python
-# Raw user query (bad retrieval query):
-"what about the other approach we discussed?"
-
-# After rewriting (good retrieval query):
-"alternative approach to [topic from conversation history]"
-
-# After decomposition (for complex queries):
-sub_queries = [
-    "what are the approaches to X?",
-    "what are the trade-offs of approach A vs B?",
-    "what did we conclude about X in prior turns?"
-]
-
-# Multi-query expansion:
-queries = [
-    "embedding dimensionality reduction techniques",
-    "vector space compression methods for dense retrieval",
-    "PCA matryoshka representation learning"
-]
-# → retrieve for each, merge + deduplicate results
-```
+| Transformation | Example of what changes |
+|---|---|
+| Raw conversational request | “What about the other approach we discussed?” lacks a standalone referent |
+| Query rewriting | Resolve what “the other approach” refers to using authorized conversation history |
+| Decomposition | Separate identification of alternatives, trade-offs and previous conclusions |
+| Multi-query expansion | Search technical terms, paraphrases and known aliases, then merge and deduplicate the results |
 
 | Technique | When to Use | Cost |
 |---|---|---|
@@ -417,7 +388,7 @@ Top-K ranking is insufficient. It over-selects near-duplicates (documents that a
 Maximize:  Collective task utility of selected set S
 Subject to:
   Σ tokens(d) for d in S  ≤  budget_limit
-  All hard filters(d) = True  for d in S
+  All authorization and other hard filters(d) = True for d in S
 ```
 
 **MMR (Maximum Marginal Relevance)** [Carbonell & Goldstein 1998]:
@@ -476,7 +447,7 @@ Freshness constraint:  SOFT
 
 ---
 
-## Progressive Disclosure — Don't Load What You Don't Need
+### Tool disclosure and loading mechanisms
 
 ```
 Naive approach (all tools loaded):
@@ -506,7 +477,7 @@ Step 3: Load full schemas for selected tools only
 │                                             Total:  ≈ 930 tokens │
 └──────────────────────────────────────────────────────────────────┘
 
-Savings: ~7,000 tokens per invocation
+Illustrative savings only: exact values depend on schemas and selection method
 ```
 
 **Progressive disclosure** is the principle of loading detail on demand rather than all upfront. It's not just about tools.
@@ -515,11 +486,11 @@ Savings: ~7,000 tokens per invocation
 
 | Layer | Naive Approach | Progressive Approach | Typical Savings |
 |---|---|---|---|
-| **Tool Schemas** | Load all 50 tool schemas | Catalog → select → load schemas | 70–90% token reduction |
-| **Documents** | Load full documents | Load chunks → expand sections on demand | 60–80% |
-| **Conversation History** | Full transcript | Recent + summarized older history | 40–70% |
-| **System Prompt** | Monolithic prompt | Modular sections, load persona as needed | 20–50% |
-| **Execution State** | Full workflow state | Load only state relevant to current step | 50–80% |
+| **Tool Schemas** | Load all 50 tool schemas | Catalog → select → load schemas | Depends on schema complexity and discovery overhead |
+| **Documents** | Load full documents | Load chunks → expand sections on demand | Task-dependent |
+| **Conversation History** | Full transcript | Recent + summarized older history | Task-dependent |
+| **System Prompt** | Monolithic prompt | Modular sections, load relevant permitted content | Task-dependent |
+| **Execution State** | Full workflow state | Load only state relevant to current step | Task-dependent |
 
 ```mermaid
 stateDiagram-v2
@@ -541,7 +512,7 @@ stateDiagram-v2
 
 ---
 
-## Context Compression
+### Compression techniques and prior research
 
 When you can't cut more content — either because everything is task-critical or because the user provided an inherently long input — compression is the lever.
 
@@ -571,10 +542,7 @@ Algorithm (coarse-to-fine):
 
 3. Result: compressed prompt that preserves the high-information tokens
 
-Measured performance:
-  2×  compression  → <1% accuracy loss on evaluated tasks
-  5×  compression  → ~3% accuracy loss
-  20× compression  → ~10% accuracy loss (task-dependent)
+Study results depend on task, model and dataset; do not infer a fixed error rate from a compression ratio.
 ```
 
 **LLMLingua-2** [Pan et al. 2024](https://arxiv.org/abs/2403.12968) (ACL 2024 Findings):
@@ -602,7 +570,7 @@ Measured performance:
 
 ---
 
-## Context Failures — Debugging
+### Symptoms and diagnostic techniques
 
 ```
 Production "model failure" taxonomy:
@@ -637,34 +605,14 @@ Production "model failure" taxonomy:
 
 ### The Golden Rule of Context Debugging
 
-```python
-# DO THIS: Log the actual serialized model input
-def call_model(assembled_context):
-    payload = serialize_to_messages(assembled_context)
-    
-    # Log WHAT WAS ACTUALLY SENT — not what you intended to send
-    logger.debug({
-        "token_count": count_tokens(payload),
-        "layer_breakdown": {
-            "system_instructions": count_tokens(payload.system),
-            "tool_schemas": count_tokens(payload.tools),
-            "retrieved_evidence": count_tokens(payload.evidence),
-            "conversation_history": count_tokens(payload.history),
-            "current_request": count_tokens(payload.user_message),
-        },
-        "included_doc_ids": [d.id for d in assembled_context.evidence],
-        "retrieval_scores": [d.score for d in assembled_context.evidence],
-        "context_hash": hash(payload),  # for reproducibility
-    })
-    
-    return model_client.complete(payload)
-```
+**A diagnostic trace should record:** model and tokenizer version, actual request-token count, input-layer breakdown, ordered document identifiers, evidence scores, schema versions, selection reasons and a reproducible payload fingerprint. Retain raw payloads only where privacy, access controls and retention policies permit. A hash alone does not reconstruct the input.
 
-Don't log your context assembly intent. Log the bytes.
+
+Capture evidence of what was actually serialized and sent, with appropriate privacy controls; intent alone is not a sufficient production trace.
 
 ---
 
-## Context Security
+### Threat model and defense-in-depth
 
 ```mermaid
 flowchart TD
@@ -771,8 +719,7 @@ budget_allocation = {
 
 ---
 
-
-## CM-07 — Tool Context and Progressive Disclosure: Production Design
+## CM-07 — Tool Context and Progressive Disclosure
 
 The progressive-disclosure overview above covers the idea; production engineering adds *tool identity, authorization, lifecycle, and execution safety*.
 
@@ -843,21 +790,8 @@ flowchart TD
 
 Suggested persisted checkpoint schema:
 
-```json
-{
-  "job_id": "job-123",
-  "tenant_id": "tenant-A",
-  "goal": "Ship API integration",
-  "requirements": ["Preserve backwards compatibility"],
-  "completed_steps": ["Mapped endpoints"],
-  "pending_steps": ["Add contract tests"],
-  "artifacts": [{"path": "src/client.go", "revision": "git-sha"}],
-  "last_verified_state": "tests passing at git-sha",
-  "open_questions": ["Does staging use v2 auth?"],
-  "tool_call_ids": ["call-456"],
-  "checkpoint_version": 3
-}
-```
+A useful checkpoint records the job and tenant identifiers, goal, non-negotiable requirements, verified completed steps, pending steps, artifact paths and revisions, open questions, tool-call identifiers and the checkpoint version. It stores references to credentials rather than secrets.
+
 
 Only persist non-secret references to credentials; load credentials from a secure runtime. Checkpoints must be versioned. On restart: validate current environment and artifact revisions; do not simply trust an old summary. Design for tool retries, idempotency, partial failures and concurrent workers.
 
@@ -962,9 +896,9 @@ flowchart TB
     X --> OBS
 ```
 
-**Capstone: Context-Managed Long-Horizon Agent**
+**Proposed capstone architecture: Context-Managed Long-Horizon Agent**
 
-Build an agent that can solve a multi-step engineering task while surviving context exhaustion, interruptions, failures and safe handoffs. Implement:
+A production design should enable an agent to solve multi-step tasks while surviving context exhaustion, interruptions, failures and safe handoffs. Its essential architectural concerns are:
 1. Model capability registry: limits, pricing, availability, tokenizer/count API, caching and modality.
 2. Scoped retrieval and tool registry with progressive disclosure.
 3. Explicit evidence coverage, deduplication, ranking and token-budgeted selection.
@@ -973,7 +907,7 @@ Build an agent that can solve a multi-step engineering task while surviving cont
 6. Tool-call validation, policy enforcement, bounded retries and idempotency.
 7. An evaluation harness to compare lean context, 100k+ context, and up to 1M where supported and affordable.
 
-**Definition of done:** Real test results for correctness, context tokens, wall-clock latency, provider cost, injection resistance, failure recovery, cache hit rate and correctness after compaction. Treat anything not yet implemented as *design*, not accomplishment.
+**Validation criteria when implemented:** Real test results for correctness, context tokens, wall-clock latency, provider cost, injection resistance, failure recovery, cache hit rate and correctness after compaction. Treat anything not yet implemented as *design*, not accomplishment.
 
 ---
 
@@ -989,7 +923,7 @@ Build an agent that can solve a multi-step engineering task while surviving cont
 | Anthropic Claude | Anthropic documents 1M context for several latest Claude models on Amazon Bedrock. | Window and rollout depend on the specific Claude model and hosting platform. |
 | OpenAI | Pricing documentation distinguishes short-context and long-context tiers for current model families. | Do not infer a universal 1M limit from a pricing tier; verify the exact model card and API response restrictions. |
 
-These are **time-stamped examples**, not a guarantee of access on every account. See provider sources below.
+These are **time-stamped examples**, not a guarantee of access on every account. Google currently restricts 2.5-series API access for new projects; consult its current model catalog. See provider sources below.
 
 ### Capacity vs utilization vs economics
 
@@ -1003,19 +937,8 @@ These are **time-stamped examples**, not a guarantee of access on every account.
 
 ### Production decision policy
 
-```text
-Request arrives
-  -> enforce tenant/user permissions and per-job spend cap
-  -> determine task type + required evidence coverage
-  -> retrieve or load authoritative artifacts
-  -> estimate/count actual input tokens for chosen model
-  -> select the smallest evidence-complete context
-  -> retain stable prefix for cache friendliness
-  -> reserve output, tool-loop and safety budget
-  -> if larger context genuinely helps, route to compatible long-context model
-  -> invoke with tracing and explicit timeout/retry policy
-  -> evaluate answer/evidence correctness; persist durable task state
-```
+**Production flow:** authenticate and authorize the request → determine the evidence needed → retrieve authorized artifacts → estimate input size with the model's tokenizer → select an evidence-complete subset → preserve cache-friendly stable prefixes → reserve output and tool headroom → route to long context only when justified → trace outcomes and persist durable state.
+
 
 **When full/very-long context can be reasonable:** detailed repository-level analysis, complex legal or technical document review, multi-document comparisons with cross-document dependencies, and multimodal synthesis where selection might delete necessary links.
 
@@ -1023,7 +946,7 @@ Request arrives
 
 ### Cost and latency example (hypothetical)
 
-If 1,000,000 uncached input tokens cost $2 per million, **each input alone costs $2**. A 10-step agent repeatedly sending the same full input could incur ~$20 in input billing before outputs, reasoning, tool calls or retries. Caching may materially lower this, but only if eligible repeated prefixes actually hit the provider's cache. Provider-specific long-context pricing and thresholds may raise cost above the simple example.
+At a purely hypothetical price of $2 per million uncached input tokens, **1,000,000 input tokens cost $2**. A 10-step agent repeatedly sending the same full input could incur ~$20 in input billing before outputs, reasoning, tool calls or retries. Caching may materially lower this, but only if eligible repeated prefixes actually hit the provider's cache. Provider-specific long-context pricing and thresholds may raise cost above the simple example.
 
 For a more realistic estimate, calculate:
 ```text
@@ -1035,7 +958,7 @@ total_cost =
 + any cache storage or tool charges
 ```
 
-**Prompt caching != persistent memory:** caches speed or discount repeated content; they do not grant the model durable cross-session knowledge. Cache-hit strategy often relies on stable prefixes. Changing system text, tool ordering or early documents may lose reuse.
+**Prompt caching is not persistent memory:** caches speed or discount repeated content; they do not grant the model durable cross-session knowledge. Cache-hit strategy often relies on stable prefixes. Changing system text, tool ordering or early documents may lose reuse.
 
 ### Operational policies to benchmark
 
@@ -1046,7 +969,7 @@ total_cost =
 
 Record input tokens, cached tokens, output tokens, time to first token, end-to-end latency, tool retries, dollars per successful task and accuracy by context length. Run the *same tasks* through lean, expanded and long-context variants; do not assume the biggest wins.
 
-### Current official documentation
+### Official documentation for re-verification
 
 - Google model example: https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro
 - Google long-context guide: https://ai.google.dev/gemini-api/docs/long-context
@@ -1058,9 +981,9 @@ Record input tokens, cached tokens, output tokens, time to first token, end-to-e
 
 ---
 
-## Comparison with AI Engineering From Scratch: Missing Details and Implementation Exercises
+## Cross-Reference Review: Missing Concepts and Production Considerations
 
-> Reviewed against [rohitg00/ai-engineering-from-scratch — Context Engineering lesson](https://github.com/rohitg00/ai-engineering-from-scratch/blob/main/phases/11-llm-engineering/05-context-engineering/docs/en.md) on 2026-11-16. This is an independent technical comparison, not a reproduction of the reference's code. Reference implementations are teaching demos and require significant changes before production use.
+> Reviewed against [rohitg00/ai-engineering-from-scratch — Context Engineering lesson](https://github.com/rohitg00/ai-engineering-from-scratch/blob/main/phases/11-llm-engineering/05-context-engineering/docs/en.md) on 2026-11-16. This is an independent technical comparison, not a reproduction of the reference's implementation. Reference implementations are teaching demos and require significant changes before production use.
 
 ### Coverage comparison
 
@@ -1170,7 +1093,7 @@ Compare approaches using evidence coverage, answer correctness, latency, total t
 
 > [!IMPORTANT]
 > **3. Ordering is a design variable**
-> Don't assume position doesn't matter. Evaluate it. The U-shaped performance effect is real for retrieval-augmented tasks.
+> Don't assume position doesn't matter. Evaluate it. Position effects have been observed on retrieval-augmented tasks; measure them on current models.
 
 > [!TIP]
 > **4. Progressive disclosure**
@@ -1206,4 +1129,4 @@ Compare approaches using evidence coverage, answer correctness, latency, total t
 
 ---
 
-*Last updated: 2026-11-16 | Conceptual reference CM-00 through CM-14; research comparison and production trade-offs; hands-on completion tracked separately*
+*Last reviewed: 2026-11-16 | Conceptual reference CM-00 through CM-14; practical completion tracked in the index*
