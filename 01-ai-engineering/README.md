@@ -9,7 +9,7 @@
 | Topic | What it studies | Status |
 |-------|----------------|--------|
 | [Vector Databases](vector-databases/00-INDEX.md) | Embedding geometry · ANN indexes (HNSW, IVF-PQ, DiskANN) · compression · storage internals · query processing · distributed architecture · system comparison · production ops | Active |
-| [Context Engineering](context-engineering/00-INDEX.md) | Context construction, budgeting, ordering, compression, retrieval-as-selection, security — CM-00 through CM-06 complete | Active |
+| [Context Engineering](context-engineering/00-INDEX.md) | Context windows, selection, compression, tool context, security, evaluation and production trade-offs — CM-00–06 studied; CM-07–14 documented | Active |
 | [Agent Memory](agent-memory/00-INDEX.md) | Memory taxonomy, lifecycle, retrieval, real systems (Mem0, Letta, Zep), evaluation, security | Active |
 | [RAG in Production](rag-in-production/00-INDEX.md) | 12-category failure taxonomy, CITE-RAG architecture, hybrid search, sufficiency check, observability, production checklist | Active |
 
@@ -38,4 +38,4 @@ flowchart TD
 
 ---
 
-*Last updated: 2026-11-11*
+*Last updated: 2026-11-16*
