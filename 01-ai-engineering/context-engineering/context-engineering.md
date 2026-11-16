@@ -1058,6 +1058,143 @@ Record input tokens, cached tokens, output tokens, time to first token, end-to-e
 
 ---
 
+## Comparison with AI Engineering From Scratch: Missing Details and Implementation Exercises
+
+> Reviewed against [rohitg00/ai-engineering-from-scratch — Context Engineering lesson](https://github.com/rohitg00/ai-engineering-from-scratch/blob/main/phases/11-llm-engineering/05-context-engineering/docs/en.md) on 2026-11-16. This is an independent technical comparison, not a reproduction of the reference's code. Reference implementations are teaching demos and require significant changes before production use.
+
+### Coverage comparison
+
+| Reference topic | In these field notes? | Next improvement |
+|---|---|---|
+| Context-window budget accounting | Yes — formulas and overflow policies | Implement typed budget ledger and model-specific limit registry |
+| Lost-in-the-middle | Yes — paper, limitations and positioning | Add repeatable ordering/position ablation |
+| Conversation history truncation / sliding window / compression | Covered conceptually | Implement history and explicit state-preservation tests |
+| Short-, long-term and episodic memory | Memory distinguished from context | Keep memory system design in separate agent-memory track |
+| Dynamic intent-based assembly | Architecture covered | Define interfaces and generate the real model-bound payload |
+| Dynamic tool selection | CM-07 design covered | Benchmark discovery/select/load against all-tool baseline |
+| Few-shot examples | **Underrepresented** | Add task-conditioned example selection and evaluation |
+| Token-waste detector | Token metrics covered | Add component-level waste warnings |
+| Context replay | Observability covered | Build a deterministic replayer and budget visualization |
+| Contextual Retrieval | Retrieval covered; contextual indexing not explained | Explain chunk enrichment at index time and measure retrieval effect |
+| KV-cache and inference phases | Named, not sufficiently explained | Add prefill/decode/TTFT/TPOT and deployment economics |
+
+### Few-shot examples are a context layer too
+
+The application can select demonstrations of the desired output style and reasoning *format* based on task type (e.g., schema extraction, bug triage, classification). Unlike a static system prompt, examples can vary by invocation.
+
+- **Eligibility:** only approved examples with no private or cross-tenant material.
+- **Selection:** match task type and edge cases, not merely semantic similarity; include counterexamples where useful.
+- **Packing:** account for example input, expected output, labels and separators.
+- **Evaluation:** compare zero-shot, fixed examples and dynamically selected examples on identical held-out tasks.
+- **Failure:** irrelevant demonstrations may induce the wrong output pattern or cause unnecessary context expansion.
+
+### Build a token-aware budget ledger (implementation specification)
+
+```python
+@dataclass(frozen=True)
+class ContextItem:
+    id: str
+    kind: str            # instruction, user, tool, history, evidence, example, state
+    content: object
+    priority: int
+    protected: bool
+    source_ref: str | None
+
+@dataclass(frozen=True)
+class ModelLimits:
+    max_total_tokens: int | None
+    max_input_tokens: int | None
+    max_output_tokens: int
+    safety_margin: int
+
+# Model/provider API may have combined or separate input/output constraints.
+# Count the EXACT messages + tool schemas + modality payload with a compatible
+# tokenizer/count API; do not silently truncate arbitrary words/JSON/code.
+# Return:
+#   serialized_messages, exposed_tool_schemas, included_item_ids,
+#   excluded_item_ids_with_reasons, token_breakdown, expected_output_reserve
+```
+
+**Budget algorithm:** (1) enforce tenant authorization, (2) protect required instructions and user intent, (3) count actual serialized component tokens, (4) reserve output space according to endpoint constraints, (5) rank optional items using expected task utility, coverage, trust and cost, (6) pack coherent items, (7) rerun whole-payload token counting, and (8) fail clearly or apply an audited compaction policy if the payload still exceeds limits.
+
+**Crucial bug to avoid:** If a budget manager records token counts but never emits the selected, correctly ordered model input, it is not yet a context assembler. If it estimates tokens using `len(text.split()) * 1.3`, it is not precise admission control. If it truncates arbitrary words, it can destroy structured values, instructions or essential evidence. The linked reference deliberately uses such approximations for teaching.
+
+### Position-aware packing experiment
+
+Compare the *same evidence* in the beginning, middle and end of the evidence region. Hold model, task, distractor count, format and budget fixed. Include at least (A) relevance-sorted, (B) interleaved high relevance at both ends, and (C) shuffled ordering. Test across both short and long prompts. Record required-fact recall, end-task correctness, latency and token counts.
+
+Do not assume attention weights directly reveal information use; end-task behavior is the relevant signal. No universal '40–70% bad zone' or guaranteed optimal order exists.
+
+### Conversation-history manager and compaction contract
+
+```text
+Recent turns (verbatim)
+    + Durable task checkpoint (goal, constraints, decisions, unresolved work)
+    + Targeted older-turn retrieval (only when needed)
+    + Exact artifact references (never paraphrase code patches, IDs or citations)
+    = bounded continuation context
+```
+
+Trigger compaction by a soft token threshold and task boundary, not an unverified fixed number of turns. Protect current requirements, user corrections, security boundaries and tool-call linkage. Test whether an interrupted workflow can resume without inventing completed steps. **This is short-horizon context construction; durable personalized/episodic memory remains a separate topic.**
+
+### Token-waste detector and deterministic context replay
+
+**Waste signals (heuristics to test, not arbitrary production limits):** repeated schemas, exact or near-duplicate retrieved evidence, large low-relevance blocks, redundant examples, stale tool results, unused document segments and excessive retransmitted history.
+
+**Replay inputs:** invocation manifest, model/version/settings, tokenizer, ordered item IDs, source revisions, selected schema versions, retrieval/ranking settings, compaction checkpoint and redacted usage metadata.
+
+**Replay modes:** (1) exact context reconstruction from versioned artifacts, (2) counterfactual selection policy on frozen candidates, (3) long-context ordering ablation. Trace any unreproducible external tool results and cache changes explicitly. Plot actual tokens by component across steps, and record when compaction first becomes necessary.
+
+### Contextual Retrieval: restore missing document-specific meaning
+
+A retrieved chunk such as 'The parameter must be 60 seconds' is ambiguous after splitting. Contextual Retrieval prepends a brief *source-grounded* explanation of what the chunk refers to **before indexing for embedding and/or BM25**, rather than only adding explanations at answer time.
+
+```text
+Original chunk: "Set the timeout to 60 seconds."
+
+Contextualized indexed chunk:
+"From Payments API v2 / webhook retry policy; this setting controls the
+maximum wait for a webhook delivery attempt. Set the timeout to 60 seconds."
+```
+
+Test raw chunks, contextual embeddings, contextual BM25, and contextual hybrid + reranking. Track Recall@K, retrieval failure rate, storage/index cost and end-to-end answer correctness. Source-ground the added description to avoid hallucinated keywords and cross-tenant contamination.
+
+In Anthropic's **specific reported evaluation**, contextual embeddings plus contextual BM25 reduced top-20 retrieval failure rate from **5.7% to 2.9%** (49% relative reduction), and adding reranking reduced it to **1.9%** (67% relative reduction). Those are not universal improvements. See [Anthropic's study](https://www.anthropic.com/research/contextual-retrieval) and [implementation cookbook](https://platform.claude.com/cookbook/capabilities-contextual-embeddings-guide).
+
+### Prefill, decode, KV-cache and long-window economics
+
+Long context matters beyond token billing:
+
+| Concept | Meaning for context engineering |
+|---|---|
+| **Prefill** | Model processes prompt input; huge prompts can increase initial response latency and inference work |
+| **Decode** | Autoregressive output generation; generation cost depends on sequence length, architecture and batching |
+| **TTFT** | Time to first token: affected by queueing, prompt processing, caching and platform scheduling |
+| **TPOT** | Time per output token: affected by model, attention/KV access, batching and serving backend |
+| **KV cache** | Stores attention key/value representations so decoding need not recompute the entire prefix every token; consumes accelerator memory |
+| **MQA / GQA** | Attention designs that can reduce KV memory/bandwidth relative to ordinary multi-head attention |
+| **Chunked prefill** | Serving technique that divides prompt processing into chunks to improve scheduling and coexist with decoding workloads |
+| **Prompt caching** | Provider feature for reusing/discounting repeated prefixes; rules differ by API and is distinct from app memory or a general KV-cache guarantee |
+
+Do not infer real latency by extrapolating a vanilla transformer `O(n²)` equation. Modern inference systems vary in attention kernels, attention architectures, batching and cache management. Measure TTFT, TPOT, p95 latency, throughput, cached input and accelerator-memory pressure (when self-hosting).
+
+Research: [Pope et al., Efficiently Scaling Transformer Inference](https://arxiv.org/abs/2211.05102), [Ainslie et al., Grouped-Query Attention](https://arxiv.org/abs/2305.13245), [Agrawal et al., SARATHI / chunked prefill](https://arxiv.org/abs/2308.16369).
+
+### Reproducible implementation exercises
+
+1. **Budget ledger:** build an API-accurate token budget and verify selected items fit the model endpoint. No silent word truncation.
+2. **History policy A/B/C:** full recent window vs extractive checkpoint vs LLM summary. Verify preserved decisions, unresolved steps, and exact references.
+3. **Tool selection benchmark:** 5/10/20/50 schemas with relevant-tool success, forbidden-tool denial, token count and latency.
+4. **Position ablation:** shuffle/move required evidence across positions, keeping content constant.
+5. **Contextual chunk benchmark:** raw vs contextualized vs hybrid + reranked results; test provenance as well as recall.
+6. **Context replay:** rebuild each invocation's serialized payload and compare token allocation across turns.
+7. **Compression comparison:** truncation, extractive selection, summary and checkpoint on at least 20 representative documents or task traces; measure *information retained* and downstream correctness.
+8. **Long-window comparison:** lean, 100k+, and 1M where supported; measure correctness, TTFT, TPOT, token cost and final task success.
+
+**Source-review caveat:** The reference contains specific contemporary model-window and performance numbers that should be verified against official model documentation at time of deployment. Its rough token counter, keyword router and illustrative history summarizer are not production-safe defaults. Its sample `ContextEngine.assemble` returns a budget report rather than the assembled model message payload; that is a useful teaching scaffold but not a deployable context manager.
+
+---
+
 ## Key Principles
 
 > [!IMPORTANT]
@@ -1106,4 +1243,4 @@ Record input tokens, cached tokens, output tokens, time to first token, end-to-e
 
 ---
 
-*Last updated: 2026-11-16 | Reference material CM-00 through CM-14; hands-on completion tracked separately*
+*Last updated: 2026-11-16 | Reference material CM-00 through CM-14; additional reference comparison and implementation exercises; hands-on completion tracked separately*
