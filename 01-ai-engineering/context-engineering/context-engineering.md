@@ -1,6 +1,6 @@
-# Context Engineering: A Field Note for AI Engineers
+# Context Engineering: From Context Windows to Production Systems
 
-> **Field Note CM-00 → CM-14** | Author: Personal Reference | Status: Living Document (reference coverage is not proof of hands-on completion)
+> A technical deep dive into how AI systems construct, select, order, compress, secure and evaluate the information sent to language models.
 
 ---
 
@@ -719,7 +719,7 @@ budget_allocation = {
 
 ---
 
-## CM-07 — Tool Context and Progressive Disclosure
+## Tool Context and Progressive Disclosure
 
 The progressive-disclosure overview above covers the idea; production engineering adds *tool identity, authorization, lifecycle, and execution safety*.
 
@@ -751,7 +751,7 @@ flowchart LR
 
 ---
 
-## CM-08 — Context Compression, Compaction and Loss Accounting
+## Context Compression, Compaction and Loss Accounting
 
 Compression is not the same as summarization, and prompt caching is not compression:
 
@@ -772,7 +772,7 @@ Compression is not the same as summarization, and prompt caching is not compress
 
 ---
 
-## CM-09 — Execution Context and State Handoffs
+## Execution Context and State Handoffs
 
 A context window is **not** durable task state. For an agent running for hours or days, put operational truth in a database/filesystem/workflow engine and reconstruct compact model context at each step.
 
@@ -797,7 +797,7 @@ Only persist non-secret references to credentials; load credentials from a secur
 
 ---
 
-## CM-10 — Multi-Agent Context Transfer
+## Multi-Agent Context Transfer
 
 Multiple agents do not automatically improve reasoning. They add *context transfer boundaries*.
 
@@ -814,7 +814,7 @@ The receiving agent should verify artifact versions and permissions independentl
 
 ---
 
-## CM-11 — Context Observability and Failure Diagnosis
+## Context Observability and Failure Diagnosis
 
 Log a **replayable manifest**, not raw sensitive prompts by default.
 
@@ -835,7 +835,7 @@ Diagnostic experiment: hold model/prompt fixed; rerun with (a) oracle evidence, 
 
 ---
 
-## CM-12 — Context Security and Trust Boundaries
+## Context Security and Trust Boundaries
 
 The threat model above is the beginning, not the security policy.
 
@@ -851,7 +851,7 @@ Attack tests must verify **outcomes** (unauthorized read blocked, secret not dis
 
 ---
 
-## CM-13 — Evaluation: Does Context Actually Help?
+## Evaluation: Does Context Actually Help?
 
 Distinguish **retrieval success**, **selection success**, **model utilization**, **task success**, **security** and **economics**.
 
@@ -873,7 +873,7 @@ Use a fixed benchmark corpus and task set; version model, documents, tools and s
 
 ---
 
-## CM-14 — Production Architecture and Capstone
+## Production Context Engineering Architecture
 
 ```mermaid
 flowchart TB
@@ -896,9 +896,9 @@ flowchart TB
     X --> OBS
 ```
 
-**Proposed capstone architecture: Context-Managed Long-Horizon Agent**
+### Long-horizon agent architecture
 
-A production design should enable an agent to solve multi-step tasks while surviving context exhaustion, interruptions, failures and safe handoffs. Its essential architectural concerns are:
+For long-running AI systems, the architecture should support multi-step tasks while surviving context exhaustion, interruptions, failures and safe handoffs. Essential design concerns include:
 1. Model capability registry: limits, pricing, availability, tokenizer/count API, caching and modality.
 2. Scoped retrieval and tool registry with progressive disclosure.
 3. Explicit evidence coverage, deduplication, ranking and token-budgeted selection.
@@ -907,7 +907,7 @@ A production design should enable an agent to solve multi-step tasks while survi
 6. Tool-call validation, policy enforcement, bounded retries and idempotency.
 7. An evaluation harness to compare lean context, 100k+ context, and up to 1M where supported and affordable.
 
-**Validation criteria when implemented:** Real test results for correctness, context tokens, wall-clock latency, provider cost, injection resistance, failure recovery, cache hit rate and correctness after compaction. Treat anything not yet implemented as *design*, not accomplishment.
+**Production validation criteria:** Real test results for correctness, context tokens, wall-clock latency, provider cost, injection resistance, failure recovery, cache hit rate and correctness after compaction. Treat anything not yet implemented as *design*, not accomplishment.
 
 ---
 
@@ -981,25 +981,11 @@ Record input tokens, cached tokens, output tokens, time to first token, end-to-e
 
 ---
 
-## Cross-Reference Review: Missing Concepts and Production Considerations
+## Additional Production Considerations
 
-> Reviewed against [rohitg00/ai-engineering-from-scratch — Context Engineering lesson](https://github.com/rohitg00/ai-engineering-from-scratch/blob/main/phases/11-llm-engineering/05-context-engineering/docs/en.md) on 2026-11-16. This is an independent technical comparison, not a reproduction of the reference's implementation. Reference implementations are teaching demos and require significant changes before production use.
+### From conceptual principles to production decisions
 
-### Coverage comparison
-
-| Reference topic | In these field notes? | Next improvement |
-|---|---|---|
-| Context-window budget accounting | Yes — formulas and overflow policies | Implement typed budget ledger and model-specific limit registry |
-| Lost-in-the-middle | Yes — paper, limitations and positioning | Add repeatable ordering/position ablation |
-| Conversation history truncation / sliding window / compression | Covered conceptually | Implement history and explicit state-preservation tests |
-| Short-, long-term and episodic memory | Memory distinguished from context | Keep memory system design in separate agent-memory track |
-| Dynamic intent-based assembly | Architecture covered | Define interfaces and generate the real model-bound payload |
-| Dynamic tool selection | CM-07 design covered | Benchmark discovery/select/load against all-tool baseline |
-| Few-shot examples | **Underrepresented** | Add task-conditioned example selection and evaluation |
-| Token-waste detector | Token metrics covered | Add component-level waste warnings |
-| Context replay | Observability covered | Build a deterministic replayer and budget visualization |
-| Contextual Retrieval | Retrieval covered; contextual indexing not explained | Explain chunk enrichment at index time and measure retrieval effect |
-| KV-cache and inference phases | Named, not sufficiently explained | Add prefill/decode/TTFT/TPOT and deployment economics |
+A context strategy must be evaluated as an end-to-end system, not simply as prompt formatting. Several practical dimensions deserve special attention: adaptive token allocation, dynamically selected few-shot examples, reliable conversation compaction, position-aware evidence packing, token-waste detection, invocation replay, contextualized indexing, and inference-time cost and latency.
 
 ### Few-shot examples are a context layer too
 
@@ -1129,4 +1115,4 @@ Compare approaches using evidence coverage, answer correctness, latency, total t
 
 ---
 
-*Last reviewed: 2026-11-16 | Conceptual reference CM-00 through CM-14; practical completion tracked in the index*
+*Last reviewed: 2026-11-16*
