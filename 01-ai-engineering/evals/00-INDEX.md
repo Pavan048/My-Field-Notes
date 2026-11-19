@@ -1,6 +1,6 @@
 # LLM & Agent Evals — Field Notes
 
-> **One navigation file + one long technical blog.** CampusX 2026 LLM Evaluation playlist as a syllabus backbone, extended with original examples, production design, reproducible calculations, RAG/agent evaluation, and interview drills.
+> **Start here, then read one connected technical blog.** The guide teaches each important concept through a running TenantDesk example, failure investigations, worked numbers, diagrams, fixes and interview explanations. It follows the CampusX playlist topic sequence while adding independent production engineering depth.
 
 [**Read the complete engineering guide →**](evals-deep-dive.md)
 
@@ -20,16 +20,16 @@ flowchart LR
 
 **Evals are an executable definition of success**: a dataset + system version + scoring rules + analysis + release decisions, not just a one-off judge prompt.
 
-## Read in this order if interviewing tomorrow
+## Choose a reading path
 
 | Priority | Topic | Deep-dive section | Outcome |
 |---|---|---|---|
 | P0 | Evals lifecycle, model vs application, slices | [§1–4](evals-deep-dive.md#1-evals-are-an-engineering-loop) | Explain what and why |
-| P0 | Reference metrics & judge calibration | [§5–7](evals-deep-dive.md#5-evaluation-methods-and-their-failure-modes) | Pick reliable evaluators |
-| P0 | RAG retrieval, generator & triad | [§9–12](evals-deep-dive.md#9-rag-the-component-level-evaluation-map) | Answer “how would you evaluate RAG?” |
+| P0 | **Why LLM judges fail, G-Eval, calibration** | [§7](evals-deep-dive.md#7-llm-as-a-judge-why-a-convincing-score-is-not-the-truth) | Explain bias, failure examples, mitigation and confidence |
+| P0 | **RAG retrieval, generator & triad** | [§9–12](evals-deep-dive.md#9-rag-the-component-level-evaluation-map) | Calculate metrics and diagnose missing evidence vs hallucination |
 | P0 | Safety, regression, online monitoring | [§13–16](evals-deep-dive.md#13-safety-and-adversarial-evaluation) | Explain deployment gates |
 | P1 | Operational metrics, experiments, agents | [§17–19](evals-deep-dive.md#17-operational-evals-latency-throughput-and-cost) | Production depth |
-| P1 | Full code, interview answers | [§20–23](evals-deep-dive.md#20-a-minimal-reproducible-eval-harness) | Demonstrate hands-on skill |
+| P1 | Full Python harness and interview drill | [§20–23](evals-deep-dive.md#20-a-minimal-reproducible-eval-harness) | Demonstrate hands-on skill |
 
 ## Playlist alignment — all 19 videos
 
